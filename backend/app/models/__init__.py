@@ -146,7 +146,6 @@ class Developer(Base):
 
     user = relationship("User", back_populates="developer")
     projects = relationship("ProjectDeveloper", back_populates="developer")
-    tasks = relationship("Task", foreign_keys="Task.assigned_to_id", overlaps="assigned_tasks")
 
 
 class Client(Base):
@@ -200,7 +199,7 @@ class Project(Base):
 
     client = relationship("Client", back_populates="projects")
     created_by = relationship("User", back_populates="created_projects")
-    lab = relationship("Lab", back_populates="projects")
+    lab = relationship("Lab", back_populates="projects", foreign_keys=[lab_id])
     developers = relationship("ProjectDeveloper", back_populates="project", cascade="all, delete-orphan")
     tasks = relationship("Task", back_populates="project", cascade="all, delete-orphan")
     invoices = relationship("Invoice", back_populates="project")
