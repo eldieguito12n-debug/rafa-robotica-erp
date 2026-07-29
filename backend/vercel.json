@@ -1,9 +1,5 @@
 {
-  "buildCommand": "echo build_python",
   "devCommand": "uvicorn app.main:app --reload --port 8000",
-  "installCommand": "pip install -r requirements.txt",
-  "framework": null,
-  "outputDirectory": ".",
   "functions": {
     "api/index.py": {
       "includeFiles": "app/**"

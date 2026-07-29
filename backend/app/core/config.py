@@ -34,7 +34,13 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+if os.environ.get("VERCEL"):
+    settings.UPLOAD_DIR = "/tmp/uploads"
+
+try:
+    os.makedirs(settings.UPLOAD_DIR, exist_ok=True)
+except Exception:
+    pass
 
 # Agregamos dinámicamente orígenes CORS de variables Vercel
 _vercel_url = os.environ.get("VERCEL_URL") or os.environ.get("FRONTEND_URL")
