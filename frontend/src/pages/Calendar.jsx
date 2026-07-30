@@ -7,6 +7,7 @@ import {
 import { cn, formatDate } from '../lib/utils';
 import { calendarAPI, usersAPI, projectsAPI } from '../lib/api';
 import { useAppData } from '../context/AppDataContext';
+import { useAuth } from '../context/AuthContext';
 import Avatar from '../components/ui/Avatar.jsx';
 
 const defaultColors = ['primary', 'neon-green', 'neon-yellow', 'neon-purple', 'neon-blue', 'red'];
@@ -45,6 +46,8 @@ const colorMap = {
 
 export default function Calendar() {
   const { addToast } = useAppData();
+  const { isAdmin } = useAuth();
+  const isManagerOrAdmin = isAdmin;
   const today = new Date();
   const [current, setCurrent] = useState(new Date(today.getFullYear(), today.getMonth(), 1));
   const [selected, setSelected] = useState(today.getDate());
@@ -97,18 +100,34 @@ export default function Calendar() {
     try {
       const payload = { ...form };
       if (payload.project_id) payload.project_id = Number(payload.project_id);
+      else payload.project_id = null; // Send null instead of empty string
+
       if (payload.assigned_to_ids) {
         if (typeof payload.assigned_to_ids === 'string') {
-          payload.assigned_to_ids = payload.assigned_to_ids
+          payload.attendees = payload.assigned_to_ids
             .split(/[,\s]+/).map(s => Number(s.trim())).filter(n => !isNaN(n));
+        } else {
+          payload.attendees = payload.assigned_to_ids;
         }
       } else {
-        payload.assigned_to_ids = [];
+        payload.attendees = [];
       }
+      
+      // Combine date and time to datetime
       if (payload.all_day) {
-        payload.start_time = null;
-        payload.end_time = null;
+        payload.start_datetime = `${payload.date}T00:00:00Z`;
+        payload.end_datetime = `${payload.date}T23:59:59Z`;
+      } else {
+        payload.start_datetime = `${payload.date}T${payload.start_time}:00Z`;
+        payload.end_datetime = `${payload.date}T${payload.end_time}:00Z`;
       }
+
+      delete payload.date;
+      delete payload.start_time;
+      delete payload.end_time;
+      delete payload.assigned_to_ids;
+      delete payload.color;
+
       await calendarAPI.create(payload);
       addToast('Evento creado', 'success');
       setShowModal(false);
@@ -123,18 +142,23 @@ export default function Calendar() {
   const dayEventsMap = useMemo(() => {
     const out = {};
     events.forEach(e => {
-      const d = new Date(e.date);
+      if (!e.start_datetime) return;
+      const d = new Date(e.start_datetime);
       if (d.getFullYear() === year && d.getMonth() === month) {
         const day = d.getDate();
         if (!out[day]) out[day] = [];
         const guess = typeGuess(e.title);
-        const color = e.color && colorMap[e.color] ? e.color : guess.color;
+        const color = guess.color; // color is not saved in backend right now
+        
+        const startTimeStr = d.toISOString().substring(11, 16);
+        const endTimeStr = e.end_datetime ? new Date(e.end_datetime).toISOString().substring(11, 16) : '';
+        
         out[day].push({
           ...e,
           _color: color,
           _type: guess.type,
           _Icon: guess.Icon,
-          _time: e.all_day ? 'Todo el día' : [e.start_time, e.end_time].filter(Boolean).join(' - ').slice(0, 13) || 'Sin horario',
+          _time: e.all_day ? 'Todo el día' : `${startTimeStr} - ${endTimeStr}`.slice(0, 13) || 'Sin horario',
         });
       }
     });
@@ -192,7 +216,9 @@ export default function Calendar() {
           </div>
           <div className="relative"><FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-500" size={12}/><input value={filter} onChange={e=>setFilter(e.target.value)} placeholder="Buscar evento..." className="input-field !py-2 !pl-8 text-sm w-48"/></div>
           <button onClick={loadData} className="btn-secondary !px-3 !py-2 !text-sm" title="Refrescar"><FaSyncAlt size={12}/></button>
-          <button className="btn-primary !px-3 !py-2 !text-sm" onClick={openNew}><FaPlus size={12}/> Nuevo Evento</button>
+          {isManagerOrAdmin && (
+            <button className="btn-primary !px-3 !py-2 !text-sm" onClick={openNew}><FaPlus size={12}/> Nuevo Evento</button>
+          )}
         </div>
       </motion.div>
 
@@ -279,17 +305,21 @@ export default function Calendar() {
                       <div className="min-w-0 flex-1">
                         <div className="font-bold text-sm">{e.title}</div>
                         <div className="text-[11px] mt-1 opacity-80 flex items-center gap-1"><FaRegClock size={9}/> {e._time}</div>
-                        {pr && <div className="text-[11px] mt-1 opacity-80">📍 {pr.name}</div>}
-                        {us.length > 0 && (
-                          <div className="flex items-center gap-1 mt-2">
-                            {us.slice(0,3).map(u => <Avatar key={u.id} name={u.full_name} id={u.id} size="xs" />)}
-                            {us.length > 3 && <span className="text-[10px] text-dark-500 ml-1">+{us.length - 3}</span>}
-                          </div>
+                        {isManagerOrAdmin && (
+                          <>
+                            {pr && <div className="text-[11px] mt-1 opacity-80">📍 {pr.name}</div>}
+                            {us.length > 0 && (
+                              <div className="flex items-center gap-1 mt-2">
+                                {us.slice(0,3).map(u => <Avatar key={u.id} name={u.full_name} id={u.id} size="xs" />)}
+                                {us.length > 3 && <span className="text-[10px] text-dark-500 ml-1">+{us.length - 3}</span>}
+                              </div>
+                            )}
+                            {e.description && <div className="text-[11px] mt-2 opacity-70 border-t border-white/10 pt-2">{e.description}</div>}
+                            <div className="mt-2 flex gap-1">
+                              <button onClick={() => handleDelete(e)} className="text-[10px] px-2 py-1 rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-300 border border-white/10 flex items-center gap-1"><FaTrash size={9} /> Eliminar</button>
+                            </div>
+                          </>
                         )}
-                        {e.description && <div className="text-[11px] mt-2 opacity-70 border-t border-white/10 pt-2">{e.description}</div>}
-                        <div className="mt-2 flex gap-1">
-                          <button onClick={() => handleDelete(e)} className="text-[10px] px-2 py-1 rounded-lg bg-white/5 hover:bg-red-500/20 hover:text-red-300 border border-white/10 flex items-center gap-1"><FaTrash size={9} /> Eliminar</button>
-                        </div>
                       </div>
                     </div>
                   </motion.div>
