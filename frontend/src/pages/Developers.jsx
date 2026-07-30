@@ -5,6 +5,7 @@ import { authAPI, usersAPI } from '../lib/api';
 import Avatar from '../components/ui/Avatar.jsx';
 import { cn, formatNumber, getStatusBadge } from '../lib/utils';
 import { useAppData } from '../context/AppDataContext';
+import { useAuth } from '../context/AuthContext';
 
 export default function Developers() {
   const [devs, setDevs] = useState([]);
@@ -26,12 +27,23 @@ export default function Developers() {
   });
 
   const { addToast } = useAppData();
+  const { hasRole, isAdmin } = useAuth();
 
   const load = async () => {
     try {
       const res = await usersAPI.developers();
       setDevs(res.data);
     } catch {} finally { setLoading(false); }
+  };
+
+  const handleRateDeveloper = async (devId, rating) => {
+    try {
+      await usersAPI.updateDeveloper(devId, { performance_score: rating });
+      addToast('Calificación actualizada', 'success');
+      load();
+    } catch (e) {
+      addToast('Error al actualizar calificación', 'error');
+    }
   };
 
   useEffect(() => {
@@ -225,11 +237,36 @@ export default function Developers() {
                 <div className="space-y-3">
                   <div>
                     <div className="flex items-center justify-between text-xs mb-1">
-                      <span className="text-dark-400 flex items-center gap-1"><FaChartLine size={10} /> Rendimiento</span>
-                      <span className="font-mono font-bold text-neon-green">{d.performance_score || 0}%</span>
+                      <span className="text-dark-400 flex items-center gap-1"><FaStar size={10} /> Rendimiento Mensual</span>
                     </div>
-                    <div className="progress-bar">
-                      <div className="progress-fill" style={{ width: `${d.performance_score || 0}%` }} />
+                    <div className="flex items-center gap-1">
+                      {[1, 2, 3, 4, 5].map((star) => {
+                        // Escalar el valor si estaba en base 100 (antiguo)
+                        let currentRating = d.performance_score || 0;
+                        if (currentRating > 5) currentRating = Math.round(currentRating / 20);
+                        
+                        const isFilled = star <= currentRating;
+                        const canRate = isAdmin() || hasRole('jefe_desarrollo');
+                        
+                        return (
+                          <button
+                            key={star}
+                            disabled={!canRate}
+                            onClick={() => handleRateDeveloper(d.id, star)}
+                            className={cn(
+                              "transition-transform",
+                              canRate ? "hover:scale-125 cursor-pointer" : "cursor-default",
+                              isFilled ? "text-neon-yellow" : "text-dark-600"
+                            )}
+                            title={canRate ? "Calificar" : "Solo el Jefe de Desarrollo o Admin puede calificar"}
+                          >
+                            <FaStar size={16} />
+                          </button>
+                        );
+                      })}
+                      <span className="ml-2 text-xs font-bold text-dark-300">
+                        {d.performance_score > 5 ? Math.round(d.performance_score / 20) : (d.performance_score || 0)} / 5
+                      </span>
                     </div>
                   </div>
                   <div>
