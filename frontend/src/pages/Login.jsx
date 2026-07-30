@@ -12,8 +12,8 @@ export default function Login() {
   const location = useLocation();
   const from = location.state?.from?.pathname || '/dashboard';
 
-  const [email, setEmail] = useState('admin@robolab.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('');
+  const [password, setPassword] = useState('');
   const [showPass, setShowPass] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -100,23 +100,7 @@ export default function Login() {
           </button>
         </form>
 
-        <div className="mt-5 pt-5 border-t border-dark-600/50 space-y-3">
-          <div className="text-[11px] uppercase font-bold text-dark-500 tracking-wider text-center">Acceso rápido demo</div>
-          <div className="grid grid-cols-2 gap-2">
-            <button onClick={() => quickLogin('admin@robolab.com', 'admin123')} className="text-xs px-3 py-2 rounded-lg bg-primary-600/15 hover:bg-primary-600/25 border border-primary-500/30 text-primary-300 font-semibold transition">
-              🔐 Admin
-            </button>
-            <button onClick={() => quickLogin('jefe@robolab.com', 'jefe123')} className="text-xs px-3 py-2 rounded-lg bg-neon-green/10 hover:bg-neon-green/20 border border-neon-green/30 text-neon-green font-semibold transition">
-              🧑‍💼 Jefe Dev
-            </button>
-            <button onClick={() => quickLogin('dev@robolab.com', 'dev123')} className="text-xs px-3 py-2 rounded-lg bg-neon-blue/10 hover:bg-neon-blue/20 border border-neon-blue/30 text-neon-blue font-semibold transition">
-              👨‍💻 Programador
-            </button>
-            <button onClick={() => quickLogin('cliente@robolab.com', 'cli123')} className="text-xs px-3 py-2 rounded-lg bg-neon-purple/10 hover:bg-neon-purple/20 border border-neon-purple/30 text-neon-purple font-semibold transition">
-              👥 Cliente
-            </button>
-          </div>
-        </div>
+
 
         <div className="mt-6 text-center text-xs text-dark-500">
           ¿Olvidaste tu contraseña?{' '}

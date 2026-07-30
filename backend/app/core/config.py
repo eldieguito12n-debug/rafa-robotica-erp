@@ -8,7 +8,7 @@ class Settings(BaseSettings):
     SECRET_KEY: str = "robolab_super_secret_key_2024_change_in_production_xyz"
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 60 * 24
-    DATABASE_URL: str = "sqlite:///./robolab_erp.db"  # SQLite en local. Vercel usar POSTGRES_URL
+    DATABASE_URL: str = "sqlite:////tmp/robolab_erp.db" if os.environ.get("VERCEL") else "sqlite:///./robolab_erp.db"  # Vercel usa /tmp para SQLite temporal
     BACKEND_CORS_ORIGINS: List[str] = [
         "http://localhost:3000",
         "http://localhost:5173",
