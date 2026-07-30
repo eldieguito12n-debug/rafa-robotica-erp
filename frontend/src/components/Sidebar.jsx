@@ -22,10 +22,10 @@ const menu = [
     { to: '/projects', label: 'Proyectos', icon: FaProjectDiagram, roles: null },
     { to: '/kanban', label: 'Tablero Kanban', icon: FaClipboardList, roles: null },
     { to: '/tasks', label: 'Tareas', icon: FaTasks, roles: null },
-    { to: '/labs', label: 'Laboratorios', icon: FaFlask, adminOnly: true },
+    { to: '/labs', label: 'Laboratorios', icon: FaFlask, roles: null },
   ]},
   { group: 'Operaciones', items: [
-    { to: '/inventory', label: 'Inventario', icon: FaBoxes, adminOnly: true },
+    { to: '/inventory', label: 'Inventario', icon: FaBoxes, roles: null },
     { to: '/calendar', label: 'Calendario', icon: FaCalendarAlt, roles: null },
     { to: '/chat', label: 'Chat Global', icon: FaComments, roles: null },
   ]},

@@ -1,8 +1,10 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { authAPI } from '../lib/api';
-import { delay } from '../lib/utils';
 
 const AuthContext = createContext(null);
+
+// Roles con acceso completo de administración
+const ADMIN_ROLES = new Set(['administrador', 'administradora', 'jefe_desarrollo']);
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -64,18 +66,77 @@ export function AuthProvider({ children }) {
     setIsAuthenticated(false);
   };
 
+  // ─── Helpers de Rol ────────────────────────────────────────────────────────
+
+  /** Verifica si el usuario tiene alguno de los roles especificados */
   const hasRole = (...roles) => {
     if (!user) return false;
     return roles.includes(user.role);
   };
 
+  /** Administrador, Administradora o Jefe de Desarrollo */
   const isAdmin = () => {
     if (!user) return false;
-    return ['administrador', 'administradora', 'jefe_desarrollo'].includes(user.role);
+    return ADMIN_ROLES.has(user.role);
+  };
+
+  // ─── Permisos Granulares ───────────────────────────────────────────────────
+
+  /** Puede ver y gestionar usuarios (crear, editar, desactivar, asignar roles) */
+  const canManageUsers = () => isAdmin();
+
+  /** Puede crear, editar y eliminar proyectos */
+  const canManageProjects = () => isAdmin();
+
+  /** Puede crear, editar y eliminar tareas (de cualquier usuario) */
+  const canManageTasks = () => isAdmin();
+
+  /** Puede crear, editar y eliminar laboratorios */
+  const canManageLabs = () => isAdmin();
+
+  /** Puede agregar productos, hacer entradas, editar y eliminar del inventario */
+  const canManageInventory = () => isAdmin();
+
+  /** Puede retirar materiales del inventario (todos los usuarios autenticados) */
+  const canWithdrawInventory = () => !!user;
+
+  /** Puede actualizar el estado de una tarea (asignada a sí mismo, o admin) */
+  const canUpdateTask = (task) => {
+    if (!user) return false;
+    if (isAdmin()) return true;
+    return task?.assigned_to_id === user.id;
+  };
+
+  /** Puede agregar comentarios/evidencias a una tarea (asignada a sí mismo, o admin) */
+  const canCommentTask = (task) => {
+    if (!user) return false;
+    if (isAdmin()) return true;
+    return task?.assigned_to_id === user.id;
   };
 
   return (
-    <AuthContext.Provider value={{ user, token, isLoading, isAuthenticated, login, register, logout, refreshUser, hasRole, isAdmin }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        isLoading,
+        isAuthenticated,
+        login,
+        register,
+        logout,
+        refreshUser,
+        hasRole,
+        isAdmin,
+        canManageUsers,
+        canManageProjects,
+        canManageTasks,
+        canManageLabs,
+        canManageInventory,
+        canWithdrawInventory,
+        canUpdateTask,
+        canCommentTask,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   );

@@ -8,7 +8,7 @@ class UserBase(BaseModel):
     email: EmailStr
     full_name: str
     phone: Optional[str] = None
-    role: models.UserRole = models.UserRole.PROGRAMADOR
+    role: str = "programador"  # string libre — permite roles personalizados
 
 
 class UserCreate(UserBase):
@@ -23,7 +23,7 @@ class UserLogin(BaseModel):
 class UserUpdate(BaseModel):
     full_name: Optional[str] = None
     phone: Optional[str] = None
-    role: Optional[models.UserRole] = None
+    role: Optional[str] = None   # string libre
     avatar_url: Optional[str] = None
     is_active: Optional[bool] = None
 
@@ -118,6 +118,7 @@ class TaskCreate(TaskBase):
     project_id: Optional[int] = None
     assigned_to_id: Optional[int] = None
     created_by_id: Optional[int] = None
+    start_date: Optional[date] = None
 
 
 class TaskUpdate(BaseModel):
@@ -137,6 +138,7 @@ class Task(TaskBase):
     project_id: Optional[int] = None
     assigned_to_id: Optional[int] = None
     created_by_id: int
+    start_date: Optional[date] = None
     actual_hours: float = 0.0
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
@@ -224,6 +226,25 @@ class InventoryItemUpdate(BaseModel):
 class InventoryItem(InventoryItemBase):
     id: int
     low_stock_alert: bool = False
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class InventoryMovementOut(BaseModel):
+    """Schema de salida para historial de movimientos de inventario."""
+    id: int
+    item_id: int
+    item_name: Optional[str] = None
+    type: str  # "entrada" | "salida"
+    quantity: int
+    reference: Optional[str] = None
+    notes: Optional[str] = None
+    user_id: Optional[int] = None
+    user_name: Optional[str] = None
+    user_role: Optional[str] = None
+    project_id: Optional[int] = None
     created_at: Optional[datetime] = None
 
     class Config:

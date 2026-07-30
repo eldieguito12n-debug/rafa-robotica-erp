@@ -4,6 +4,8 @@ import { FaFlask, FaPlus, FaSearch, FaEdit, FaCogs, FaUsers, FaMapMarkerAlt, FaS
 import { labsAPI, usersAPI } from '../lib/api';
 import { cn } from '../lib/utils';
 import { useAppData } from '../context/AppDataContext';
+import { useAuth } from '../context/AuthContext';
+import RoleGuard from '../components/ui/RoleGuard.jsx';
 
 const labStatuses = ['operativo','disponible','ocupado','mantenimiento'];
 
@@ -18,6 +20,8 @@ const emptyForm = {
 
 export default function Labs() {
   const { addToast } = useAppData();
+  const { isAdmin } = useAuth();
+  const admin = isAdmin();
   const [labs, setLabs] = useState([]);
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -125,7 +129,9 @@ export default function Labs() {
         </div>
         <div className="md:ml-auto flex items-center gap-2">
           <div className="relative"><FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-500" size={13}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar laboratorio..." className="input-field !py-2 !pl-8 text-sm w-56"/></div>
-          <button className="btn-primary !px-3 !py-2 !text-sm" onClick={openNew}><FaPlus size={12}/> Nuevo</button>
+          <RoleGuard adminOnly>
+            <button className="btn-primary !px-3 !py-2 !text-sm" onClick={openNew}><FaPlus size={12}/> Nuevo</button>
+          </RoleGuard>
         </div>
       </motion.div>
 
@@ -188,8 +194,10 @@ export default function Labs() {
                     <div className="text-xs text-dark-400 flex items-center gap-1.5 mt-1"><FaMapMarkerAlt size={9}/>{lab.location || 'Ubicación no especificada'}</div>
                   </div>
                   <div className="flex items-center gap-1">
-                    <button onClick={() => openEdit(lab)} className="w-9 h-9 rounded-lg hover:bg-dark-700/60 text-dark-400 hover:text-primary-300 flex items-center justify-center"><FaEdit size={13}/></button>
-                    <button onClick={() => handleDelete(lab)} className="w-9 h-9 rounded-lg hover:bg-red-600/20 text-dark-400 hover:text-red-300 flex items-center justify-center"><FaTrash size={13}/></button>
+                    <RoleGuard adminOnly>
+                      <button onClick={() => openEdit(lab)} className="w-9 h-9 rounded-lg hover:bg-dark-700/60 text-dark-400 hover:text-primary-300 flex items-center justify-center"><FaEdit size={13}/></button>
+                      <button onClick={() => handleDelete(lab)} className="w-9 h-9 rounded-lg hover:bg-red-600/20 text-dark-400 hover:text-red-300 flex items-center justify-center"><FaTrash size={13}/></button>
+                    </RoleGuard>
                   </div>
                 </div>
                 <p className="text-xs text-dark-300 leading-relaxed min-h-[48px] mb-4 line-clamp-3">{lab.description}</p>
@@ -216,7 +224,7 @@ export default function Labs() {
         {!loading && list.length === 0 && <div className="col-span-full text-center py-12 text-dark-500">No hay laboratorios para mostrar</div>}
       </div>
 
-      {showModal && (
+      {showModal && admin && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-sm" onClick={() => setShowModal(false)} />
           <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-2xl w-[95vw] mx-auto p-6 shadow-glass relative z-10">

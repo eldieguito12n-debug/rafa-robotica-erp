@@ -12,6 +12,9 @@ from ..core.database import get_db
 pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
+# ─── Roles con acceso completo ───────────────────────────────────────────────
+ADMIN_ROLES = {"administrador", "administradora", "jefe_desarrollo"}
+
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
     return pwd_context.verify(plain_password, hashed_password)
@@ -47,8 +50,12 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = db.query(User).filter(User.id == int(user_id)).first()
     if user is None:
         raise credentials_exception
-    # if not user.is_active:
-    #     raise HTTPException(status_code=400, detail="Inactive user")
+    # Bloquear usuarios desactivados
+    if not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Cuenta desactivada. Contacte al administrador.",
+        )
     return user
 
 
@@ -57,20 +64,26 @@ def require_roles(*roles: str):
         if user.role not in roles:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
-                detail=f"Not enough permissions. Required: {roles}",
+                detail=f"Acceso denegado. Rol requerido: {', '.join(roles)}",
             )
         return user
     return decorator
 
 
 def is_admin(user: User) -> bool:
-    return getattr(user, "role", "") in ["administrador", "administradora", "jefe_desarrollo"]
+    """Retorna True si el usuario tiene rol de administrador completo."""
+    return getattr(user, "role", "") in ADMIN_ROLES
+
+
+def is_developer_or_basic(user: User) -> bool:
+    """Retorna True si el usuario NO es administrador (rol básico/desarrollador)."""
+    return not is_admin(user)
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
     if not is_admin(user):
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
-            detail="Se requiere rol de administrador",
+            detail="Acceso denegado — Se requiere rol de Administrador o Jefe de Desarrollo.",
         )
     return user

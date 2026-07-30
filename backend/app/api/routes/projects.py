@@ -4,7 +4,7 @@ from typing import Optional, List
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles, require_admin, is_admin
 from ...core.activity_middleware import log_activity
-from ...models import Project, Task, ProjectDeveloper, User
+from ...models import Project, Task, ProjectDeveloper, User, TaskPriority
 from ...schemas import Project as ProjectSchema, ProjectCreate, ProjectUpdate, ProjectDeveloperCreate, Task as TaskSchema, TaskCreate, TaskUpdate
 
 router = APIRouter(tags=["Projects & Tasks"])
@@ -230,12 +230,12 @@ def update_task(
 
     if not is_admin(current_user):
         if t.assigned_to_id != current_user.id:
-            raise HTTPException(403, "Not enough permissions to edit this task")
-        # Ensure non-admins can only change specific fields like status
-        allowed_fields = {"status", "progress_percentage"}
+            raise HTTPException(403, "Acceso denegado — No tienes permisos para editar esta tarea")
+        # Usuarios básicos solo pueden cambiar estado, progreso, comentarios y adjuntos de sus tareas
+        allowed_fields = {"status", "progress_percentage", "comments", "attachments", "actual_hours"}
         for k in data.model_dump(exclude_unset=True).keys():
             if k not in allowed_fields:
-                raise HTTPException(403, f"Not allowed to edit field: {k}")
+                raise HTTPException(403, f"Acceso denegado — No puedes modificar el campo: {k}")
 
     old_project_id = t.project_id
     for k, v in data.model_dump(exclude_unset=True).items():

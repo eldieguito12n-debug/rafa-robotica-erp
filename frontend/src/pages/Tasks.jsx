@@ -7,11 +7,23 @@ import {
 import { tasksAPI } from '../lib/api';
 import { cn, formatDate, getStatusBadge } from '../lib/utils';
 import Avatar from '../components/ui/Avatar.jsx';
+import { useAuth } from '../context/AuthContext';
+import RoleGuard from '../components/ui/RoleGuard.jsx';
 
 const statuses = ['','pendiente','en_proceso','en_pruebas','finalizado','pausado','cancelado'];
-const priorities = ['','baja','media','alta','urgente'];
+const priorities = ['','baja','media','alta','urgente','critica'];
+
+const priorityColors = {
+  baja: 'bg-neon-green/10 text-neon-green border-neon-green/30',
+  media: 'bg-neon-blue/10 text-neon-blue border-neon-blue/30',
+  alta: 'bg-neon-yellow/10 text-neon-yellow border-neon-yellow/30',
+  urgente: 'bg-neon-orange/10 text-neon-yellow border-neon-yellow/40',
+  critica: 'bg-red-500/15 text-red-400 border-red-500/40 animate-pulse',
+};
 
 export default function Tasks() {
+  const { isAdmin, user } = useAuth();
+  const admin = isAdmin();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -29,7 +41,10 @@ export default function Tasks() {
     project_id: 1,
     priority: 'media',
     status: 'pendiente',
-    estimated_hours: 8
+    start_date: '',
+    due_date: '',
+    estimated_hours: 8,
+    assigned_to_id: '',
   });
 
   const load = async () => {
@@ -47,13 +62,17 @@ export default function Tasks() {
   useEffect(() => { load(); }, [status, priority]);
 
   const handleAddQuickTask = () => {
+    if (!admin) return;
     setForm({
       title: '',
       description: '',
       project_id: 1,
       priority: 'media',
       status: 'pendiente',
-      estimated_hours: 8
+      start_date: '',
+      due_date: '',
+      estimated_hours: 8,
+      assigned_to_id: '',
     });
     setShowNew(true);
   };
@@ -118,7 +137,9 @@ export default function Tasks() {
             {priorities.filter(Boolean).map(p => <option key={p} value={p}>{p}</option>)}
           </select>
           <button className="btn-secondary !px-3 !py-2 !text-sm"><FaFilter size={12} /></button>
-          <button className="btn-primary !px-3 !py-2 !text-sm" onClick={handleAddQuickTask}><FaPlus size={12} /> Nueva Tarea</button>
+          <RoleGuard adminOnly>
+            <button className="btn-primary !px-3 !py-2 !text-sm" onClick={handleAddQuickTask}><FaPlus size={12} /> Nueva Tarea</button>
+          </RoleGuard>
         </div>
       </motion.div>
 
@@ -174,7 +195,9 @@ export default function Tasks() {
                           <span className="text-xs truncate">{t.assigned_to_name}</span>
                         </div>
                       </td>
-                      <td className="py-3 px-4"><span className={getStatusBadge(t.priority)}>{t.priority}</span></td>
+                      <td className="py-3 px-4">
+                        <span className={cn('text-xs px-2.5 py-1 rounded-lg border font-semibold capitalize', priorityColors[t.priority] || priorityColors.media)}>{t.priority}</span>
+                      </td>
                       <td className={`py-3 px-4 text-xs hidden sm:table-cell ${overdue ? 'text-red-400 font-bold' : 'text-dark-400'}`}>
                         {formatDate(t.due_date) || '—'}
                         {overdue && ' ⚠'}
@@ -188,8 +211,13 @@ export default function Tasks() {
                       <td className="py-3 px-4"><span className={getStatusBadge(t.status)}>{String(t.status).replace(/_/g,' ')}</span></td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-end gap-1">
-                          <button className="w-7 h-7 rounded-lg hover:bg-primary-500/15 text-primary-400 flex items-center justify-center"><FaEdit size={11} /></button>
-                          <button className="w-7 h-7 rounded-lg hover:bg-red-500/15 text-red-400 flex items-center justify-center"><FaTrash size={11} /></button>
+                          <RoleGuard adminOnly>
+                            <button className="w-7 h-7 rounded-lg hover:bg-primary-500/15 text-primary-400 flex items-center justify-center" title="Editar"><FaEdit size={11} /></button>
+                            <button className="w-7 h-7 rounded-lg hover:bg-red-500/15 text-red-400 flex items-center justify-center" title="Eliminar"><FaTrash size={11} /></button>
+                          </RoleGuard>
+                          {!admin && t.assigned_to_id === user?.id && (
+                            <button className="w-7 h-7 rounded-lg hover:bg-primary-500/15 text-primary-400 flex items-center justify-center" title="Ver / Actualizar estado"><FaEdit size={11} /></button>
+                          )}
                         </div>
                       </td>
                     </motion.tr>

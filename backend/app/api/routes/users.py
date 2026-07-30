@@ -2,11 +2,10 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from ...core.database import get_db
-from ...core.security import get_current_user, require_roles
+from ...core.security import get_current_user, require_roles, require_admin, ADMIN_ROLES
 from ...core.activity_middleware import log_activity
-from ...models import User, UserRole, Developer, Client
+from ...models import User, Developer, Client
 from ...schemas import User as UserSchema, UserUpdate, DeveloperCreate, Developer as DeveloperSchema, ClientCreate, Client as ClientSchema
-from ...core.security import require_admin
 
 router = APIRouter(prefix="/users", tags=["Users & Developers"])
 
@@ -20,6 +19,7 @@ def list_users(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
+    """Solo Administrador / Jefe de Desarrollo pueden ver todos los usuarios."""
     q = db.query(User)
     if role:
         q = q.filter(User.role == role)
@@ -28,11 +28,20 @@ def list_users(
     return q.offset(skip).limit(limit).all()
 
 
+@router.get("/roles", tags=["Users & Developers"])
+def list_roles(db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+    """Retorna los roles únicos registrados en la DB + roles base del sistema."""
+    base_roles = list(ADMIN_ROLES) + ["programador", "ingeniero_electronico", "disenador_cad", "tecnico", "contador", "cliente"]
+    db_roles = [r[0] for r in db.query(User.role).distinct().all() if r[0]]
+    all_roles = sorted(set(base_roles + db_roles))
+    return {"roles": all_roles}
+
+
 @router.get("/{user_id}", response_model=UserSchema)
 def get_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
     return user
 
 
@@ -45,7 +54,7 @@ def update_user(
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(user, key, value)
     db.flush()
@@ -63,15 +72,19 @@ def delete_user(
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
-        raise HTTPException(status_code=404, detail="User not found")
+        raise HTTPException(status_code=404, detail="Usuario no encontrado")
+    # Evitar que el admin se desactive a sí mismo
+    if user.id == current_user.id:
+        raise HTTPException(status_code=400, detail="No puedes desactivar tu propia cuenta")
     user.is_active = False
     db.flush()
-    log_activity(db, current_user.id, "eliminar", "user", user.id, {"email": user.email, "full_name": user.full_name})
+    log_activity(db, current_user.id, "desactivar", "user", user.id, {"email": user.email, "full_name": user.full_name})
     db.commit()
-    return {"message": "User deactivated"}
+    return {"message": "Usuario desactivado"}
 
 
-# Developers
+# ─── Developers ───────────────────────────────────────────────────────────────
+
 @router.get("/developers/all", response_model=List[DeveloperSchema])
 def list_developers(
     search: Optional[str] = None,
@@ -104,7 +117,7 @@ def create_developer(
 def get_developer(dev_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     dev = db.query(Developer).filter(Developer.id == dev_id).first()
     if not dev:
-        raise HTTPException(status_code=404, detail="Developer not found")
+        raise HTTPException(status_code=404, detail="Desarrollador no encontrado")
     return dev
 
 
@@ -112,7 +125,7 @@ def get_developer(dev_id: int, db: Session = Depends(get_db), current_user: User
 def update_developer(dev_id: int, data: dict, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     dev = db.query(Developer).filter(Developer.id == dev_id).first()
     if not dev:
-        raise HTTPException(status_code=404, detail="Developer not found")
+        raise HTTPException(status_code=404, detail="Desarrollador no encontrado")
     for k, v in data.items():
         if hasattr(dev, k):
             setattr(dev, k, v)
@@ -123,7 +136,8 @@ def update_developer(dev_id: int, data: dict, db: Session = Depends(get_db), cur
     return dev
 
 
-# Clients
+# ─── Clients ──────────────────────────────────────────────────────────────────
+
 @router.get("/clients/all", response_model=List[ClientSchema])
 def list_clients(search: Optional[str] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     q = db.query(Client)

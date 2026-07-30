@@ -24,13 +24,19 @@ import Calendar from './pages/Calendar.jsx';
 import Chat from './pages/Chat.jsx';
 import Reports from './pages/Reports.jsx';
 import Labs from './pages/Labs.jsx';
+import AccessDenied from './pages/AccessDenied.jsx';
 import NotFound from './pages/NotFound.jsx';
 import Toasts from './components/ui/Toasts.jsx';
 import AIAssistant from './components/AIAssistant.jsx';
 
+/**
+ * RequireAuth — Protege rutas según autenticación y rol.
+ * Si adminOnly=true y el usuario no es admin, redirige a /access-denied (403).
+ */
 function RequireAuth({ children, roles, adminOnly }) {
   const { isAuthenticated, user, isLoading, isAdmin } = useAuth();
   const location = useLocation();
+
   if (isLoading) {
     return (
       <div className="min-h-screen bg-dark-950 grid-bg flex items-center justify-center">
@@ -38,9 +44,10 @@ function RequireAuth({ children, roles, adminOnly }) {
       </div>
     );
   }
+
   if (!isAuthenticated) return <Navigate to="/login" state={{ from: location }} replace />;
-  if (adminOnly && !isAdmin()) return <Navigate to="/dashboard" replace />;
-  if (roles && user && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
+  if (adminOnly && !isAdmin()) return <Navigate to="/access-denied" replace />;
+  if (roles && user && !roles.includes(user.role)) return <Navigate to="/access-denied" replace />;
 
   return children;
 }
@@ -57,29 +64,50 @@ export default function App() {
       <AIAssistant />
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
+          {/* Auth */}
           <Route element={<AuthLayout />}>
             <Route path="/login" element={<Login />} />
             <Route path="/forgot-password" element={<ForgotPassword />} />
           </Route>
+
+          {/* Página de acceso denegado (sin layout de app) */}
+          <Route path="/access-denied" element={<AccessDenied />} />
+
+          {/* App — requiere autenticación */}
           <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/users" element={<RequireAuth adminOnly><Users /></RequireAuth>} />
+
+            {/* Gestión de Usuarios — solo Admin */}
+            <Route path="/users"      element={<RequireAuth adminOnly><Users /></RequireAuth>} />
             <Route path="/developers" element={<RequireAuth adminOnly><Developers /></RequireAuth>} />
-            <Route path="/projects" element={<Projects />} />
+
+            {/* Proyectos — todos ven, filtrado por rol en backend */}
+            <Route path="/projects"     element={<Projects />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
-            <Route path="/kanban" element={<Kanban />} />
+            <Route path="/kanban"       element={<Kanban />} />
+
+            {/* Tareas — todos ven sus tareas, filtrado por rol en backend */}
             <Route path="/tasks" element={<Tasks />} />
-            <Route path="/inventory" element={<RequireAuth adminOnly><Inventory /></RequireAuth>} />
-            <Route path="/labs" element={<RequireAuth adminOnly><Labs /></RequireAuth>} />
+
+            {/* Inventario — todos pueden ver y retirar; crear/editar/eliminar restringido en UI+backend */}
+            <Route path="/inventory" element={<Inventory />} />
+
+            {/* Laboratorios — todos pueden ver; crear/editar/eliminar restringido en UI+backend */}
+            <Route path="/labs" element={<Labs />} />
+
+            {/* Módulos de Negocio — solo Admin */}
             <Route path="/financial" element={<RequireAuth adminOnly><Financial /></RequireAuth>} />
-            <Route path="/clients" element={<RequireAuth adminOnly><Clients /></RequireAuth>} />
-            <Route path="/quotes" element={<RequireAuth adminOnly><Quotes /></RequireAuth>} />
-            <Route path="/invoices" element={<RequireAuth adminOnly><Invoices /></RequireAuth>} />
+            <Route path="/clients"   element={<RequireAuth adminOnly><Clients /></RequireAuth>} />
+            <Route path="/quotes"    element={<RequireAuth adminOnly><Quotes /></RequireAuth>} />
+            <Route path="/invoices"  element={<RequireAuth adminOnly><Invoices /></RequireAuth>} />
+            <Route path="/reports"   element={<RequireAuth adminOnly><Reports /></RequireAuth>} />
+
+            {/* Herramientas compartidas */}
             <Route path="/calendar" element={<Calendar />} />
-            <Route path="/chat" element={<Chat />} />
-            <Route path="/reports" element={<RequireAuth adminOnly><Reports /></RequireAuth>} />
+            <Route path="/chat"     element={<Chat />} />
           </Route>
+
           <Route path="*" element={<NotFound />} />
         </Routes>
       </AnimatePresence>

@@ -44,10 +44,13 @@ export default function Users() {
   const [search, setSearch] = useState('');
   const [role, setRole] = useState('');
   const [modalOpen, setModalOpen] = useState(false);
+  const [editModal, setEditModal] = useState(false);
+  const [editingUser, setEditingUser] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
     full_name: '', email: '', phone: '', role: 'programador', custom_role: '', password: genPass(),
   });
+  const [editForm, setEditForm] = useState({ full_name: '', phone: '', role: '', is_active: true });
 
   const load = async () => {
     setLoading(true);
@@ -60,11 +63,36 @@ export default function Users() {
   useEffect(() => { load(); }, [search, role]);
 
   const toggleActive = async (u) => {
+    const action = u.is_active ? 'desactivar' : 'activar';
+    if (!confirm(`¿Seguro que deseas ${action} la cuenta de "${u.full_name}"?`)) return;
     try {
       await usersAPI.update(u.id, { is_active: !u.is_active });
       addToast(`Usuario ${u.is_active ? 'desactivado' : 'activado'}`, 'success');
       load();
-    } catch { addToast('Error actualizando', 'error'); }
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      addToast(typeof detail === 'string' ? detail : 'Error actualizando usuario', 'error');
+    }
+  };
+
+  const openEdit = (u) => {
+    setEditingUser(u);
+    setEditForm({ full_name: u.full_name || '', phone: u.phone || '', role: u.role || 'programador', is_active: u.is_active });
+    setEditModal(true);
+  };
+
+  const submitEdit = async (e) => {
+    e.preventDefault();
+    setSubmitting(true);
+    try {
+      await usersAPI.update(editingUser.id, editForm);
+      addToast('Usuario actualizado correctamente', 'success');
+      setEditModal(false);
+      load();
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      addToast(typeof detail === 'string' ? detail : 'Error actualizando usuario', 'error');
+    } finally { setSubmitting(false); }
   };
 
   const openModal = () => {
@@ -190,10 +218,10 @@ export default function Users() {
                   <td className="py-3 px-4 text-xs text-dark-400 hidden md:table-cell">{formatDate(u.created_at)}</td>
                   <td className="py-3 px-4">
                     <div className="flex items-center justify-end gap-1.5">
-                      <button className="w-8 h-8 rounded-lg hover:bg-primary-500/15 text-primary-400 hover:text-primary-300 flex items-center justify-center transition" title="Editar" onClick={() => addToast('Editar usuario (próximamente)', 'info')}>
+                      <button className="w-8 h-8 rounded-lg hover:bg-primary-500/15 text-primary-400 hover:text-primary-300 flex items-center justify-center transition" title="Editar" onClick={() => openEdit(u)}>
                         <FaEdit size={13} />
                       </button>
-                      <button className="w-8 h-8 rounded-lg hover:bg-red-500/15 text-red-400 hover:text-red-300 flex items-center justify-center transition" title="Desactivar" onClick={() => toggleActive(u)}>
+                      <button className="w-8 h-8 rounded-lg hover:bg-red-500/15 text-red-400 hover:text-red-300 flex items-center justify-center transition" title={u.is_active ? 'Desactivar' : 'Activar'} onClick={() => toggleActive(u)}>
                         <FaTrash size={13} />
                       </button>
                     </div>
@@ -300,6 +328,87 @@ export default function Users() {
                         Crear Trabajador
                       </>
                     )}
+                  </button>
+                </div>
+              </form>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* ─── Modal: Editar Usuario ─── */}
+      <AnimatePresence>
+        {editModal && editingUser && (
+          <motion.div
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            className="fixed inset-0 z-[100] bg-black/60 backdrop-blur-sm flex items-center justify-center p-4"
+            onClick={() => !submitting && setEditModal(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.95, y: 20, opacity: 0 }}
+              animate={{ scale: 1, y: 0, opacity: 1 }}
+              exit={{ scale: 0.95, y: 20, opacity: 0 }}
+              transition={{ type: 'spring', stiffness: 320, damping: 30 }}
+              className="w-full max-w-md glass hud-corner rounded-3xl p-6 md:p-7 relative"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <button onClick={() => !submitting && setEditModal(false)} className="absolute top-4 right-4 w-9 h-9 rounded-xl bg-dark-700/60 hover:bg-red-500/15 text-dark-400 hover:text-red-400 flex items-center justify-center transition">
+                <FaTimes size={14} />
+              </button>
+              <div className="mb-5">
+                <h3 className="text-xl font-black heading-glow">Editar Usuario</h3>
+                <p className="text-xs text-dark-400 mt-1">{editingUser.email}</p>
+              </div>
+
+              <form onSubmit={submitEdit} className="space-y-3.5">
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-dark-400 flex items-center gap-1.5">
+                    <FaUserTag size={10}/> Nombre Completo
+                  </label>
+                  <input
+                    type="text" value={editForm.full_name} onChange={e => setEditForm({ ...editForm, full_name: e.target.value })}
+                    placeholder="Nombre completo" className="input-field !py-2.5"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-dark-400 flex items-center gap-1.5">
+                    <FaPhone size={10}/> Teléfono <span className="text-dark-600 normal-case">(opcional)</span>
+                  </label>
+                  <input
+                    type="tel" value={editForm.phone} onChange={e => setEditForm({ ...editForm, phone: e.target.value })}
+                    placeholder="+57 300 123 4567" className="input-field !py-2.5"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <label className="text-[11px] font-semibold uppercase tracking-wider text-dark-400 flex items-center gap-1.5">
+                    <FaUserShield size={10}/> Rol
+                  </label>
+                  <select value={editForm.role} onChange={e => setEditForm({ ...editForm, role: e.target.value })} className="input-field !py-2.5">
+                    {rolesList.map(r => <option key={r} value={r}>{rolesSpanish[r] || r}</option>)}
+                    <option value="otro">Otro (Especifique)</option>
+                  </select>
+                  {editForm.role === 'otro' && (
+                    <input
+                      type="text" value={editForm.custom_role || ''} onChange={e => setEditForm({ ...editForm, role: e.target.value })}
+                      placeholder="Escriba el rol personalizado..." className="input-field !py-2.5 mt-2" autoFocus
+                    />
+                  )}
+                </div>
+                <div className="flex items-center gap-3 p-3 rounded-xl bg-dark-700/40 border border-dark-600/40">
+                  <input
+                    type="checkbox" id="edit_is_active" checked={editForm.is_active}
+                    onChange={e => setEditForm({ ...editForm, is_active: e.target.checked })}
+                    className="w-4 h-4 rounded accent-primary-500"
+                  />
+                  <label htmlFor="edit_is_active" className="text-sm font-medium cursor-pointer">
+                    Cuenta activa {editForm.is_active ? <span className="text-neon-green text-xs">(Activo)</span> : <span className="text-red-400 text-xs">(Inactivo)</span>}
+                  </label>
+                </div>
+
+                <div className="pt-4 flex gap-2.5">
+                  <button type="button" onClick={() => setEditModal(false)} disabled={submitting} className="btn-secondary flex-1 !py-2.5">Cancelar</button>
+                  <button type="submit" disabled={submitting} className="btn-primary flex-[1.2] !py-2.5 flex items-center justify-center gap-2">
+                    {submitting ? <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> : <><FaEdit size={12} /> Guardar Cambios</>}
                   </button>
                 </div>
               </form>

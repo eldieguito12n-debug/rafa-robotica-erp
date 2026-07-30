@@ -54,6 +54,7 @@ class TaskPriority(str, enum.Enum):
     MEDIA = "media"
     ALTA = "alta"
     URGENTE = "urgente"
+    CRITICA = "critica"
 
 
 class InventoryCategory(str, enum.Enum):
@@ -233,6 +234,7 @@ class Task(Base):
     priority = Column(SQLEnum(TaskPriority), default=TaskPriority.MEDIA)
     status = Column(SQLEnum(TaskStatus), default=TaskStatus.PENDIENTE)
     progress_percentage = Column(Float, default=0.0)
+    start_date = Column(Date)
     due_date = Column(Date)
     estimated_hours = Column(Float, default=0.0)
     actual_hours = Column(Float, default=0.0)
@@ -278,11 +280,14 @@ class InventoryMovement(Base):
 
     id = Column(Integer, primary_key=True, index=True)
     item_id = Column(Integer, ForeignKey("inventory_items.id"), nullable=False)
-    type = Column(String(50), nullable=False)
+    type = Column(String(50), nullable=False)  # "entrada" | "salida"
     quantity = Column(Integer, nullable=False)
     reference = Column(String(255))
     notes = Column(String(500))
     user_id = Column(Integer, ForeignKey("users.id"))
+    user_name = Column(String(255))   # captura nombre al momento del movimiento
+    user_role = Column(String(100))   # captura rol al momento del movimiento
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
 
     item = relationship("InventoryItem", back_populates="movements")
