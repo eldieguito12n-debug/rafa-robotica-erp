@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { FaCog, FaBuilding, FaBell, FaShieldAlt, FaSave, FaHistory } from 'react-icons/fa';
 import { useAppData } from '../context/AppDataContext';
 import { settingsAPI } from '../lib/api';
