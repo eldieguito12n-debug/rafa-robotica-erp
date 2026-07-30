@@ -20,9 +20,8 @@ const menu = [
     { to: '/users', label: 'Usuarios', icon: FaUsers, adminOnly: true },
     { to: '/developers', label: 'Desarrolladores', icon: FaUserTie, adminOnly: true },
     { to: '/projects', label: 'Proyectos', icon: FaProjectDiagram, roles: null },
-    { to: '/kanban', label: 'Tablero Kanban', icon: FaClipboardList, roles: null },
     { to: '/tasks', label: 'Tareas', icon: FaTasks, roles: null },
-    { to: '/labs', label: 'Laboratorios', icon: FaFlask, roles: null },
+    { to: '/labs', label: 'Laboratorios', icon: FaFlask, adminOnly: true },
   ]},
   { group: 'Operaciones', items: [
     { to: '/inventory', label: 'Inventario', icon: FaBoxes, roles: null },

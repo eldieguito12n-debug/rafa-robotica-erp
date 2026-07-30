@@ -13,7 +13,6 @@ import Users from './pages/Users.jsx';
 import Developers from './pages/Developers.jsx';
 import Projects from './pages/Projects.jsx';
 import ProjectDetail from './pages/ProjectDetail.jsx';
-import Kanban from './pages/Kanban.jsx';
 import Tasks from './pages/Tasks.jsx';
 import Inventory from './pages/Inventory.jsx';
 import Financial from './pages/Financial.jsx';
@@ -26,6 +25,7 @@ import Reports from './pages/Reports.jsx';
 import Labs from './pages/Labs.jsx';
 import AccessDenied from './pages/AccessDenied.jsx';
 import NotFound from './pages/NotFound.jsx';
+import Settings from './pages/Settings.jsx';
 import Toasts from './components/ui/Toasts.jsx';
 import AIAssistant from './components/AIAssistant.jsx';
 
@@ -47,7 +47,7 @@ function RequireAuth({ children, roles, adminOnly }) {
 
   if (!isAuthenticated) return <Navigate to="/login" state={{ from: location }} replace />;
   if (adminOnly && !isAdmin()) return <Navigate to="/access-denied" replace />;
-  if (roles && user && !roles.includes(user.role)) return <Navigate to="/access-denied" replace />;
+  if (roles && user && !roles.map(r => r.toLowerCase()).includes((user.role || '').toLowerCase())) return <Navigate to="/access-denied" replace />;
 
   return children;
 }
@@ -85,7 +85,6 @@ export default function App() {
             {/* Proyectos — todos ven, filtrado por rol en backend */}
             <Route path="/projects"     element={<Projects />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
-            <Route path="/kanban"       element={<Kanban />} />
 
             {/* Tareas — todos ven sus tareas, filtrado por rol en backend */}
             <Route path="/tasks" element={<Tasks />} />
@@ -93,8 +92,8 @@ export default function App() {
             {/* Inventario — todos pueden ver y retirar; crear/editar/eliminar restringido en UI+backend */}
             <Route path="/inventory" element={<Inventory />} />
 
-            {/* Laboratorios — todos pueden ver; crear/editar/eliminar restringido en UI+backend */}
-            <Route path="/labs" element={<Labs />} />
+            {/* Laboratorios — solo Admin */}
+            <Route path="/labs" element={<RequireAuth adminOnly><Labs /></RequireAuth>} />
 
             {/* Módulos de Negocio — solo Admin */}
             <Route path="/financial" element={<RequireAuth adminOnly><Financial /></RequireAuth>} />
@@ -102,6 +101,7 @@ export default function App() {
             <Route path="/quotes"    element={<RequireAuth adminOnly><Quotes /></RequireAuth>} />
             <Route path="/invoices"  element={<RequireAuth adminOnly><Invoices /></RequireAuth>} />
             <Route path="/reports"   element={<RequireAuth adminOnly><Reports /></RequireAuth>} />
+            <Route path="/settings"  element={<RequireAuth adminOnly><Settings /></RequireAuth>} />
 
             {/* Herramientas compartidas */}
             <Route path="/calendar" element={<Calendar />} />

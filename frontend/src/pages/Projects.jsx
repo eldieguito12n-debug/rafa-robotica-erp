@@ -9,8 +9,9 @@ import { projectsAPI, clientsAPI } from '../lib/api';
 import { cn, formatCurrency, formatDate, getStatusBadge } from '../lib/utils';
 import Avatar from '../components/ui/Avatar.jsx';
 import { useAppData } from '../context/AppDataContext';
+import { useAuth } from '../context/AuthContext';
 
-const statuses = ['planeacion','en_progreso','en_pruebas','finalizado','pausado','cancelado'];
+const statuses = ['pendiente','en_progreso','en_pruebas','finalizado','pausado','cancelado'];
 
 const emptyForm = {
   name: '',
@@ -19,11 +20,12 @@ const emptyForm = {
   budget: '',
   start_date: '',
   end_date: '',
-  status: 'planeacion',
+  status: 'pendiente',
 };
 
 export default function Projects() {
   const { addToast } = useAppData();
+  const { isAdmin } = useAuth();
   const [projects, setProjects] = useState([]);
   const [clients, setClients] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -69,7 +71,7 @@ export default function Projects() {
       budget: p.budget_value || p.budget || '',
       start_date: p.start_date ? String(p.start_date).slice(0,10) : '',
       end_date: p.end_date ? String(p.end_date).slice(0,10) : '',
-      status: p.status || 'planeacion',
+      status: p.status || 'pendiente',
     });
     setShowModal(true);
   };
@@ -82,6 +84,8 @@ export default function Projects() {
     delete payload.budget;
     if (payload.client_id) payload.client_id = Number(payload.client_id);
     else payload.client_id = null;
+    if (!payload.start_date) payload.start_date = null;
+    if (!payload.end_date) payload.end_date = null;
     try {
       if (editing) {
         await projectsAPI.update(editing, payload);
@@ -93,6 +97,8 @@ export default function Projects() {
       setShowModal(false);
       load();
     } catch (err) {
+      console.error('Projects Error Payload:', payload);
+      console.error('Projects Error Response:', err?.response?.data);
       addToast(err?.response?.data?.detail || 'Error guardando proyecto', 'error');
     } finally {
       setSaving(false);
@@ -135,7 +141,7 @@ export default function Projects() {
           </select>
           <button className="btn-secondary !px-3 !py-2 !text-sm"><FaFilter size={12} /></button>
           <button className="btn-secondary !px-3 !py-2 !text-sm"><FaDownload size={12} /></button>
-          <button className="btn-primary !px-3 !py-2 !text-sm" onClick={openNew}><FaPlus size={12} /> Nuevo Proyecto</button>
+          {isAdmin() && <button className="btn-primary !px-3 !py-2 !text-sm" onClick={openNew}><FaPlus size={12} /> Nuevo Proyecto</button>}
         </div>
       </motion.div>
 
@@ -163,12 +169,16 @@ export default function Projects() {
                   </Link>
                 </div>
                 <div className="flex items-center gap-1">
-                  <button onClick={(e) => { e.preventDefault(); openEdit(p); }} className="w-8 h-8 rounded-lg bg-dark-700/60 hover:bg-primary-600/30 hover:text-primary-300 flex items-center justify-center transition" title="Editar">
-                    <FaEdit size={11} />
-                  </button>
-                  <button onClick={(e) => { e.preventDefault(); handleDelete(p); }} className="w-8 h-8 rounded-lg bg-dark-700/60 hover:bg-red-600/30 hover:text-red-300 flex items-center justify-center transition" title="Eliminar">
-                    <FaTrash size={11} />
-                  </button>
+                  {isAdmin() && (
+                    <>
+                      <button onClick={(e) => { e.preventDefault(); openEdit(p); }} className="w-8 h-8 rounded-lg bg-dark-700/60 hover:bg-primary-600/30 hover:text-primary-300 flex items-center justify-center transition" title="Editar">
+                        <FaEdit size={11} />
+                      </button>
+                      <button onClick={(e) => { e.preventDefault(); handleDelete(p); }} className="w-8 h-8 rounded-lg bg-dark-700/60 hover:bg-red-600/30 hover:text-red-300 flex items-center justify-center transition" title="Eliminar">
+                        <FaTrash size={11} />
+                      </button>
+                    </>
+                  )}
                   <Link to={`/projects/${p.id}`} className="w-9 h-9 rounded-xl bg-dark-700/60 hover:bg-primary-600/30 hover:text-primary-300 flex items-center justify-center transition group-hover:translate-x-0.5">
                     <FaArrowRight size={13} />
                   </Link>

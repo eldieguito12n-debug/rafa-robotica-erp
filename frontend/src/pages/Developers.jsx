@@ -55,9 +55,9 @@ export default function Developers() {
     { id: 7, user: { id: 7, full_name: 'Gabriel Peña', email: 'g@robolab.com' }, position: 'Contador Financiero', specialty: 'Contabilidad / Costos', availability: 'disponible', status: 'activo', hours_worked: 172, performance_score: 94, compliance_percentage: 99 },
   ];
 
-  const display = (devs?.length ? devs.map(d => ({
-    ...d, user: { id: d.user_id || d.id, full_name: `Dev #${d.id}` }
-  })) : mockDevelopers).filter(d =>
+  const display = devs.map(d => ({
+    ...d, user: { id: d.user_id || d.id, full_name: d.user?.full_name || `Dev #${d.id}` }
+  })).filter(d =>
     !filter ||
     d.position?.toLowerCase().includes(filter.toLowerCase()) ||
     d.specialty?.toLowerCase().includes(filter.toLowerCase()) ||

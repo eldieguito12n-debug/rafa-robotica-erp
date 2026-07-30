@@ -27,7 +27,7 @@ def list_financial(
     date_to: Optional[date] = None,
     category: Optional[str] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "contador")),
+    current_user: User = Depends(require_admin),
 ):
     q = db.query(FinancialRecord)
     if type:
@@ -45,14 +45,14 @@ def list_financial(
 def create_financial_record(
     data: FinancialRecordCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "contador")),
+    current_user: User = Depends(require_admin),
 ):
     if not data.user_id:
         data.user_id = current_user.id
     r = FinancialRecord(**data.model_dump())
     db.add(r)
     db.flush()
-    log_activity(db, current_user.id, "crear", "financial_record", r.id, data.model_dump())
+    log_activity(db, current_user.id, "crear", "financial_record", r.id, data.model_dump(mode='json'))
     db.commit()
     db.refresh(r)
     return r
@@ -63,7 +63,7 @@ def get_financial_summary(
     date_from: Optional[date] = None,
     date_to: Optional[date] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "contador")),
+    current_user: User = Depends(require_admin),
 ):
     q = db.query(FinancialRecord)
     if date_from:
@@ -102,12 +102,12 @@ def list_invoices(
 def create_invoice(
     data: InvoiceCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "contador")),
+    current_user: User = Depends(require_admin),
 ):
     i = Invoice(**data.model_dump())
     db.add(i)
     db.flush()
-    log_activity(db, current_user.id, "crear", "invoice", i.id, data.model_dump())
+    log_activity(db, current_user.id, "crear", "invoice", i.id, data.model_dump(mode='json'))
     db.commit()
     db.refresh(i)
     return i
@@ -144,7 +144,7 @@ def download_invoice_pdf(
 def create_payment(
     data: PaymentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "contador")),
+    current_user: User = Depends(require_admin),
 ):
     p = Payment(**data.model_dump())
     inv = db.query(Invoice).filter(Invoice.id == data.invoice_id).first()
@@ -157,7 +157,7 @@ def create_payment(
         db.add(inv)
     db.add(p)
     db.flush()
-    log_activity(db, current_user.id, "crear", "payment", p.id, data.model_dump())
+    log_activity(db, current_user.id, "crear", "payment", p.id, data.model_dump(mode='json'))
     # Regla de negocio 2: todo pago se convierte en un FinancialRecord de ingreso
     inv = db.query(Invoice).filter(Invoice.id == data.invoice_id).first()
     from datetime import datetime
@@ -203,12 +203,12 @@ def list_quotes(status: Optional[str] = None, client_id: Optional[int] = None, d
 def create_quote(
     data: QuoteCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "jefe_desarrollo", "contador")),
+    current_user: User = Depends(require_admin),
 ):
     q = Quote(**data.model_dump())
     db.add(q)
     db.flush()
-    log_activity(db, current_user.id, "crear", "quote", q.id, data.model_dump())
+    log_activity(db, current_user.id, "crear", "quote", q.id, data.model_dump(mode='json'))
     db.commit()
     db.refresh(q)
     return q
@@ -241,7 +241,7 @@ def download_quote_pdf(
 
 
 @router.post("/quotes/{quote_id}/approve")
-def approve_quote(quote_id: int, convert_to_project: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_roles("administrador"))):
+def approve_quote(quote_id: int, convert_to_project: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     q = db.query(Quote).filter(Quote.id == quote_id).first()
     if not q:
         raise HTTPException(404, "Quote not found")
@@ -270,7 +270,7 @@ def approve_quote(quote_id: int, convert_to_project: bool = False, db: Session =
 
 # ===== FINANCIAL RECORDS: Detail, Update, Delete =====
 @router.get("/financial/{record_id}", response_model=FinSchema)
-def get_financial_record(record_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_roles("administrador", "contador"))):
+def get_financial_record(record_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     r = db.query(FinancialRecord).filter(FinancialRecord.id == record_id).first()
     if not r:
         raise HTTPException(404, "Record not found")
@@ -282,7 +282,7 @@ def update_financial_record(
     record_id: int,
     data: FinancialRecordCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "contador")),
+    current_user: User = Depends(require_admin),
 ):
     r = db.query(FinancialRecord).filter(FinancialRecord.id == record_id).first()
     if not r:
@@ -290,7 +290,7 @@ def update_financial_record(
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(r, k, v)
     db.flush()
-    log_activity(db, current_user.id, "actualizar", "financial_record", r.id, data.model_dump(exclude_unset=True))
+    log_activity(db, current_user.id, "actualizar", "financial_record", r.id, data.model_dump(mode='json', exclude_unset=True))
     db.commit()
     db.refresh(r)
     return r
@@ -300,7 +300,7 @@ def update_financial_record(
 def delete_financial_record(
     record_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador")),
+    current_user: User = Depends(require_admin),
 ):
     r = db.query(FinancialRecord).filter(FinancialRecord.id == record_id).first()
     if not r:
@@ -317,7 +317,7 @@ def update_invoice(
     invoice_id: int,
     data: InvoiceCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "contador")),
+    current_user: User = Depends(require_admin),
 ):
     i = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not i:
@@ -325,7 +325,7 @@ def update_invoice(
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(i, k, v)
     db.flush()
-    log_activity(db, current_user.id, "actualizar", "invoice", i.id, data.model_dump(exclude_unset=True))
+    log_activity(db, current_user.id, "actualizar", "invoice", i.id, data.model_dump(mode='json', exclude_unset=True))
     db.commit()
     db.refresh(i)
     return i
@@ -335,7 +335,7 @@ def update_invoice(
 def delete_invoice(
     invoice_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador")),
+    current_user: User = Depends(require_admin),
 ):
     i = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not i:
@@ -360,7 +360,7 @@ def update_payment(
     payment_id: int,
     data: PaymentCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "contador")),
+    current_user: User = Depends(require_admin),
 ):
     p = db.query(Payment).filter(Payment.id == payment_id).first()
     if not p:
@@ -368,7 +368,7 @@ def update_payment(
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(p, k, v)
     db.flush()
-    log_activity(db, current_user.id, "actualizar", "payment", p.id, data.model_dump(exclude_unset=True))
+    log_activity(db, current_user.id, "actualizar", "payment", p.id, data.model_dump(mode='json', exclude_unset=True))
     db.commit()
     db.refresh(p)
     return p
@@ -378,7 +378,7 @@ def update_payment(
 def delete_payment(
     payment_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador")),
+    current_user: User = Depends(require_admin),
 ):
     p = db.query(Payment).filter(Payment.id == payment_id).first()
     if not p:
@@ -403,7 +403,7 @@ def delete_payment(
 
 # ===== QUOTES: Reject, Update, Delete =====
 @router.post("/quotes/{quote_id}/reject")
-def reject_quote(quote_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_roles("administrador", "jefe_desarrollo"))):
+def reject_quote(quote_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     q = db.query(Quote).filter(Quote.id == quote_id).first()
     if not q:
         raise HTTPException(404, "Quote not found")
@@ -419,7 +419,7 @@ def update_quote(
     quote_id: int,
     data: QuoteCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "jefe_desarrollo", "contador")),
+    current_user: User = Depends(require_admin),
 ):
     q = db.query(Quote).filter(Quote.id == quote_id).first()
     if not q:
@@ -427,7 +427,7 @@ def update_quote(
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(q, k, v)
     db.flush()
-    log_activity(db, current_user.id, "actualizar", "quote", q.id, data.model_dump(exclude_unset=True))
+    log_activity(db, current_user.id, "actualizar", "quote", q.id, data.model_dump(mode='json', exclude_unset=True))
     db.commit()
     db.refresh(q)
     return q
@@ -437,7 +437,7 @@ def update_quote(
 def delete_quote(
     quote_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador")),
+    current_user: User = Depends(require_admin),
 ):
     q = db.query(Quote).filter(Quote.id == quote_id).first()
     if not q:

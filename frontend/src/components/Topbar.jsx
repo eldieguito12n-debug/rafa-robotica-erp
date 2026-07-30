@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useLocation } from 'react-router-dom';
+import { useLocation, Link } from 'react-router-dom';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   FaBars, FaSearch, FaBell, FaRobot, FaPlus, FaCog, FaChevronDown,
@@ -14,7 +14,6 @@ const labels = {
   '/users': { label: 'Gestión de Usuarios', desc: 'Administra usuarios y permisos del sistema' },
   '/developers': { label: 'Desarrolladores', desc: 'Equipo de trabajo y rendimiento' },
   '/projects': { label: 'Proyectos', desc: 'Gestión y seguimiento de proyectos activos' },
-  '/kanban': { label: 'Tablero Kanban', desc: 'Visualización ágil de tareas' },
   '/tasks': { label: 'Tareas', desc: 'Administración y asignación de tareas' },
   '/inventory': { label: 'Inventario', desc: 'Control de componentes y suministros' },
   '/labs': { label: 'Laboratorios', desc: 'Estado de los espacios de trabajo' },
@@ -163,56 +162,14 @@ export default function Topbar() {
             </AnimatePresence>
           </div>
 
-          <button
-            onClick={() => addToast('Panel de configuración en construcción', 'info')}
-            className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center hover:bg-dark-700/60 transition text-dark-300 hover:text-white"
-          >
-            <FaCog size={15} />
-          </button>
-
-          <div className="relative">
-            <button
-              onClick={() => { setCreateMenuOpen(o => !o); setNotifOpen(false); }}
-              className="hidden md:flex items-center gap-2 btn-primary !px-3 !py-2 !text-sm"
+          {isAdmin() && (
+            <Link
+              to="/settings"
+              className="hidden sm:flex w-10 h-10 rounded-xl items-center justify-center hover:bg-dark-700/60 transition text-dark-300 hover:text-white"
             >
-              <FaPlus size={12} />
-              <span>Nuevo</span>
-              <FaChevronDown size={10} />
-            </button>
-            <AnimatePresence>
-              {createMenuOpen && (
-                <motion.div
-                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
-                  animate={{ opacity: 1, y: 0, scale: 1 }}
-                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
-                  transition={{ duration: 0.15 }}
-                  onClick={e => e.stopPropagation()}
-                  className="absolute right-0 mt-2 w-48 glass rounded-xl overflow-hidden z-50 shadow-glass hud-corner"
-                >
-                  <div className="flex flex-col py-1">
-                    <button
-                      onClick={() => {
-                        setCreateMenuOpen(false);
-                        window.location.href = '/tasks?new=true';
-                      }}
-                      className="px-4 py-2 text-left text-sm text-dark-300 hover:bg-dark-700/60 hover:text-white transition"
-                    >
-                      Nueva Tarea
-                    </button>
-                    <button
-                      onClick={() => {
-                        setCreateMenuOpen(false);
-                        window.location.href = '/developers?new=true';
-                      }}
-                      className="px-4 py-2 text-left text-sm text-dark-300 hover:bg-dark-700/60 hover:text-white transition"
-                    >
-                      Nuevo Desarrollador
-                    </button>
-                  </div>
-                </motion.div>
-              )}
-            </AnimatePresence>
-          </div>
+              <FaCog size={15} />
+            </Link>
+          )}
         </div>
       </div>
     </header>

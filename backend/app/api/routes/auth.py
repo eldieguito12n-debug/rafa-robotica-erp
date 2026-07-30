@@ -21,7 +21,7 @@ _CAN_REGISTER = ("administrador", "administradora", "jefe_desarrollo")
 def register(
     user_data: UserCreate,
     db: Session = Depends(get_db),
-    _: User = Depends(require_roles(*_CAN_REGISTER)),
+    _: User = Depends(require_roles(*ADMIN_ROLES)),
 ):
     """Registro de trabajadores: solo Administrador, Administradora y Jefe de Desarrollo."""
     db_user = db.query(User).filter(User.email == user_data.email).first()

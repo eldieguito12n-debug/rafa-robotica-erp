@@ -5,10 +5,10 @@ from .. import models
 
 
 class UserBase(BaseModel):
-    email: EmailStr
+    email: str
     full_name: str
     phone: Optional[str] = None
-    role: str = "programador"  # string libre — permite roles personalizados
+    role: Optional[str] = "programador"  # string libre — permite roles personalizados
 
 
 class UserCreate(UserBase):
@@ -30,7 +30,7 @@ class UserUpdate(BaseModel):
 
 class User(UserBase):
     id: int
-    is_active: bool
+    is_active: Optional[bool] = True
     created_at: Optional[datetime] = None
     last_login: Optional[datetime] = None
 
@@ -140,6 +140,10 @@ class Task(TaskBase):
     created_by_id: int
     start_date: Optional[date] = None
     actual_hours: float = 0.0
+    approved_by_id: Optional[int] = None
+    completed_at: Optional[datetime] = None
+    total_time_spent: float = 0.0
+    history: List[Dict[str, Any]] = []
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
 
@@ -160,7 +164,7 @@ class ProjectBase(BaseModel):
 
 class ProjectCreate(ProjectBase):
     client_id: Optional[int] = None
-    created_by_id: int
+    created_by_id: Optional[int] = None
 
 
 class ProjectUpdate(BaseModel):

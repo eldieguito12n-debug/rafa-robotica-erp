@@ -62,6 +62,18 @@ export default function Users() {
 
   useEffect(() => { load(); }, [search, role]);
 
+  const deleteUser = async (u) => {
+    if (!confirm(`⚠️ ATENCIÓN: ¿Seguro que deseas ELIMINAR PERMANENTEMENTE a "${u.full_name}" de la base de datos? Esta acción no se puede deshacer.`)) return;
+    try {
+      await usersAPI.remove(u.id);
+      addToast(`Usuario eliminado permanentemente`, 'success');
+      load();
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      addToast(typeof detail === 'string' ? detail : 'Error eliminando usuario', 'error');
+    }
+  };
+
   const toggleActive = async (u) => {
     const action = u.is_active ? 'desactivar' : 'activar';
     if (!confirm(`¿Seguro que deseas ${action} la cuenta de "${u.full_name}"?`)) return;
@@ -221,7 +233,7 @@ export default function Users() {
                       <button className="w-8 h-8 rounded-lg hover:bg-primary-500/15 text-primary-400 hover:text-primary-300 flex items-center justify-center transition" title="Editar" onClick={() => openEdit(u)}>
                         <FaEdit size={13} />
                       </button>
-                      <button className="w-8 h-8 rounded-lg hover:bg-red-500/15 text-red-400 hover:text-red-300 flex items-center justify-center transition" title={u.is_active ? 'Desactivar' : 'Activar'} onClick={() => toggleActive(u)}>
+                      <button className="w-8 h-8 rounded-lg hover:bg-red-500/15 text-red-400 hover:text-red-300 flex items-center justify-center transition" title="Eliminar Permanentemente" onClick={() => deleteUser(u)}>
                         <FaTrash size={13} />
                       </button>
                     </div>

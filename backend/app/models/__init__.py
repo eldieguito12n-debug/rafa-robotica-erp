@@ -242,12 +242,17 @@ class Task(Base):
     blueprints = Column(JSON, default=list)
     code_links = Column(JSON, default=list)
     comments = Column(JSON, default=list)
+    approved_by_id = Column(Integer, ForeignKey("users.id"))
+    completed_at = Column(DateTime(timezone=True))
+    total_time_spent = Column(Float, default=0.0)
+    history = Column(JSON, default=list)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), onupdate=func.now())
 
     project = relationship("Project", back_populates="tasks")
     assigned_to = relationship("User", foreign_keys=[assigned_to_id], back_populates="assigned_tasks")
     created_by = relationship("User", foreign_keys=[created_by_id], back_populates="created_tasks")
+    approved_by = relationship("User", foreign_keys=[approved_by_id])
 
 
 class InventoryItem(Base):

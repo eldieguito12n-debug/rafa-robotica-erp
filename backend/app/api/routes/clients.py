@@ -42,7 +42,7 @@ def create_client(
     client = Client(**data.model_dump())
     db.add(client)
     db.flush()
-    log_activity(db, current_user.id, "crear", "client", client.id, data.model_dump())
+    log_activity(db, current_user.id, "crear", "client", client.id, data.model_dump(mode='json'))
     db.commit()
     db.refresh(client)
     return client
@@ -69,7 +69,7 @@ def update_client(
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(c, k, v)
     db.flush()
-    log_activity(db, current_user.id, "actualizar", "client", c.id, data.model_dump(exclude_unset=True))
+    log_activity(db, current_user.id, "actualizar", "client", c.id, data.model_dump(mode='json', exclude_unset=True))
     db.commit()
     db.refresh(c)
     return c

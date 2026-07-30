@@ -12,7 +12,7 @@ from .routes.calendar import router as calendar_router
 from .routes.uploads import router as uploads_router
 from .routes.reports import router as reports_router
 from .routes.ai import router as ai_router
-
+from .routes.settings import router as settings_router
 api_router = APIRouter()
 
 api_router.include_router(auth_router)
@@ -28,3 +28,4 @@ api_router.include_router(calendar_router)
 api_router.include_router(uploads_router)
 api_router.include_router(reports_router)
 api_router.include_router(ai_router)
+api_router.include_router(settings_router)

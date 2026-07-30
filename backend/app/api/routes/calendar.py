@@ -22,17 +22,19 @@ def list_events(
 ):
     q = db.query(CalendarEvent)
     if date_from:
-        q = q.filter(CalendarEvent.date >= date_from)
+        q = q.filter(CalendarEvent.start_datetime >= date_from)
     if date_to:
-        q = q.filter(CalendarEvent.date <= date_to)
+        # Para incluir todo el día 'date_to', sumar 1 día o comparar con la fecha correcta
+        q = q.filter(CalendarEvent.start_datetime <= date_to)
     if project_id:
         q = q.filter(CalendarEvent.project_id == project_id)
     if assigned_to_id:
-        # assigned_to_ids es JSON/array; usamos LIKE ya que se guarda como texto en SQLite
-        q = q.filter(CalendarEvent.assigned_to_ids.ilike(f"%{assigned_to_id}%"))
+        # En Postgres podemos usar casteos de JSON si queremos buscar en attendees
+        from sqlalchemy import cast, String
+        q = q.filter(cast(CalendarEvent.attendees, String).ilike(f"%{assigned_to_id}%"))
     if created_by_id:
-        q = q.filter(CalendarEvent.created_by_id == created_by_id)
-    return q.order_by(CalendarEvent.date, CalendarEvent.start_time).all()
+        q = q.filter(CalendarEvent.user_id == created_by_id)
+    return q.order_by(CalendarEvent.start_datetime).all()
 
 
 @router.post("/calendar", response_model=CalendarEventSchema)
@@ -41,8 +43,10 @@ def create_event(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
+    if current_user.role not in ("administrador", "jefe_desarrollo"):
+        raise HTTPException(403, "Solo los administradores pueden crear eventos")
     ev = CalendarEvent(**data.model_dump())
-    ev.created_by_id = current_user.id
+    ev.user_id = current_user.id
     db.add(ev)
     db.commit()
     db.refresh(ev)
@@ -68,7 +72,7 @@ def update_event(
     if not ev:
         raise HTTPException(404, "Event not found")
     # Solo el creador o admin pueden editar
-    if ev.created_by_id != current_user.id and current_user.role not in ("administrador", "jefe_desarrollo"):
+    if ev.user_id != current_user.id and current_user.role not in ("administrador", "jefe_desarrollo"):
         raise HTTPException(403, "No permission to edit this event")
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(ev, k, v)
@@ -86,7 +90,7 @@ def delete_event(
     ev = db.query(CalendarEvent).filter(CalendarEvent.id == event_id).first()
     if not ev:
         raise HTTPException(404, "Event not found")
-    if ev.created_by_id != current_user.id and current_user.role not in ("administrador", "jefe_desarrollo"):
+    if ev.user_id != current_user.id and current_user.role not in ("administrador", "jefe_desarrollo"):
         raise HTTPException(403, "No permission to delete this event")
     db.delete(ev)
     db.commit()

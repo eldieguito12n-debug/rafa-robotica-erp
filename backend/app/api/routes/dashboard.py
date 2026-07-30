@@ -5,7 +5,7 @@ from datetime import date
 from ...core.database import get_db
 from ...core.security import get_current_user, is_admin
 from ...models import Project, Task, InventoryItem, InventoryMovement, FinancialRecord, Client, Lab, Message, Notification, CalendarEvent, ActivityLog, Developer, ProjectDeveloper, User, UserRole
-from ...schemas import User as UserSchema, UserUpdate, DashboardStats, Project, Task, InventoryItem, Lab
+from ...schemas import User as UserSchema, UserUpdate, DashboardStats, Project as ProjectSchema, Task as TaskSchema, InventoryItem as InventoryItemSchema, Lab as LabSchema
 
 router = APIRouter(prefix="/dashboard", tags=["Dashboard"])
 

@@ -13,7 +13,7 @@ pwd_context = CryptContext(schemes=["bcrypt"], deprecated="auto")
 oauth2_scheme = OAuth2PasswordBearer(tokenUrl=f"{settings.API_V1_STR}/auth/login")
 
 # ─── Roles con acceso completo ───────────────────────────────────────────────
-ADMIN_ROLES = {"administrador", "administradora", "jefe_desarrollo"}
+ADMIN_ROLES = {"administrador", "administradora", "jefe_desarrollo", "jefe de desarrollo", "admin"}
 
 
 def verify_password(plain_password: str, hashed_password: str) -> bool:
@@ -61,7 +61,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
 
 def require_roles(*roles: str):
     def decorator(user: User = Depends(get_current_user)) -> User:
-        if user.role not in roles:
+        user_role = getattr(user, "role", "").lower()
+        if user_role not in [r.lower() for r in roles]:
             raise HTTPException(
                 status_code=status.HTTP_403_FORBIDDEN,
                 detail=f"Acceso denegado. Rol requerido: {', '.join(roles)}",
@@ -71,8 +72,7 @@ def require_roles(*roles: str):
 
 
 def is_admin(user: User) -> bool:
-    """Retorna True si el usuario tiene rol de administrador completo."""
-    return getattr(user, "role", "") in ADMIN_ROLES
+    return getattr(user, "role", "").lower() in ADMIN_ROLES
 
 
 def is_developer_or_basic(user: User) -> bool:

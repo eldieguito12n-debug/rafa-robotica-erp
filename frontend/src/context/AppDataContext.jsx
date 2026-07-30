@@ -10,11 +10,19 @@ export function AppDataProvider({ children }) {
   const [aiOpen, setAiOpen] = useState(false);
 
   const addToast = useCallback((message, type = 'info', duration = 4000) => {
-    if (message && (message.toLowerCase().includes('error cargando') || message.toLowerCase().includes('error al cargar'))) {
+    if (message && typeof message === 'string' && (message.toLowerCase().includes('error cargando') || message.toLowerCase().includes('error al cargar'))) {
       return null;
     }
+    let formattedMessage = message;
+    if (typeof message !== 'string') {
+      try {
+        formattedMessage = Array.isArray(message) ? message.map(m => m.msg || JSON.stringify(m)).join(', ') : JSON.stringify(message);
+      } catch (e) {
+        formattedMessage = 'Error desconocido';
+      }
+    }
     const id = Date.now() + Math.random();
-    setToasts(t => [...t, { id, message, type }]);
+    setToasts(t => [...t, { id, message: formattedMessage, type }]);
     if (duration > 0) {
       setTimeout(() => {
         setToasts(t => t.filter(x => x.id !== id));

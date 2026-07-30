@@ -50,7 +50,7 @@ def create_inventory_item(
     item.low_stock_alert = item.quantity <= item.min_stock
     db.add(item)
     db.flush()
-    log_activity(db, current_user.id, "crear", "inventory_item", item.id, data.model_dump())
+    log_activity(db, current_user.id, "crear", "inventory_item", item.id, data.model_dump(mode='json'))
     db.commit()
     db.refresh(item)
     return item
@@ -99,7 +99,7 @@ def update_inventory_item(
         setattr(item, k, v)
     item.low_stock_alert = item.quantity <= item.min_stock
     db.flush()
-    log_activity(db, current_user.id, "actualizar", "inventory_item", item.id, data.model_dump(exclude_unset=True))
+    log_activity(db, current_user.id, "actualizar", "inventory_item", item.id, data.model_dump(mode='json', exclude_unset=True))
     db.commit()
     db.refresh(item)
     return item
@@ -179,6 +179,50 @@ def move_inventory(
         "new_quantity": item.quantity,
         "stock_status": stock_msg,
         "low_stock_alert": item.low_stock_alert,
+    }
+
+
+@router.post("/inventory/{item_id}/withdraw")
+def withdraw_inventory(
+    item_id: int,
+    quantity: int = Query(..., gt=0),
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    """Retirar existencias del inventario"""
+    item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Artículo no encontrado")
+    
+    if item.quantity < quantity:
+        raise HTTPException(
+            400,
+            f"Stock insuficiente. Disponible: {item.quantity} unidad(es).",
+        )
+
+    item.quantity -= quantity
+    item.low_stock_alert = item.quantity <= item.min_stock
+
+    mv = InventoryMovement(
+        item_id=item_id,
+        type="salida",
+        quantity=quantity,
+        reference="Retiro rápido",
+        user_id=current_user.id,
+        user_name=current_user.full_name,
+        user_role=current_user.role,
+    )
+    db.add(mv)
+    db.flush()
+    log_activity(
+        db, current_user.id, "movimiento_inventario", "inventory_item", item.id,
+        {"movement_type": "salida", "quantity": quantity},
+    )
+    db.commit()
+
+    return {
+        "message": "Retiro registrado exitosamente",
+        "new_quantity": item.quantity,
     }
 
 

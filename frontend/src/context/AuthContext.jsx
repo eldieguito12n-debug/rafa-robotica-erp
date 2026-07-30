@@ -68,16 +68,16 @@ export function AuthProvider({ children }) {
 
   // ─── Helpers de Rol ────────────────────────────────────────────────────────
 
-  /** Verifica si el usuario tiene alguno de los roles especificados */
   const hasRole = (...roles) => {
     if (!user) return false;
-    return roles.includes(user.role);
+    const lowerRole = (user.role || '').toLowerCase();
+    return roles.map(r => r.toLowerCase()).includes(lowerRole);
   };
 
-  /** Administrador, Administradora o Jefe de Desarrollo */
   const isAdmin = () => {
     if (!user) return false;
-    return ADMIN_ROLES.has(user.role);
+    const lowerRole = (user.role || '').toLowerCase();
+    return ADMIN_ROLES.has(lowerRole);
   };
 
   // ─── Permisos Granulares ───────────────────────────────────────────────────

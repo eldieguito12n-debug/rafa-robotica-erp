@@ -9,6 +9,41 @@ from ...schemas import Lab as LabSchema, LabCreate, LabUpdate
 
 router = APIRouter(tags=["Labs"])
 
+@router.get("/fix_db")
+def fix_db(db: Session = Depends(get_db)):
+    from sqlalchemy import text
+    try:
+        db.execute(text("ALTER TABLE users ALTER COLUMN role TYPE VARCHAR(50) USING role::text;"))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print("users.role error:", e)
+        
+    try:
+        db.execute(text("ALTER TABLE developers ALTER COLUMN availability TYPE VARCHAR(50) USING availability::text;"))
+        db.execute(text("ALTER TABLE developers ALTER COLUMN status TYPE VARCHAR(50) USING status::text;"))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print("developers errors:", e)
+        
+    try:
+        db.execute(text("ALTER TABLE projects ALTER COLUMN status TYPE VARCHAR(50) USING status::text;"))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print("projects error:", e)
+        
+    try:
+        db.execute(text("ALTER TABLE tasks ALTER COLUMN status TYPE VARCHAR(50) USING status::text;"))
+        db.execute(text("ALTER TABLE tasks ALTER COLUMN priority TYPE VARCHAR(50) USING priority::text;"))
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        print("tasks error:", e)
+
+    return {"message": "Enums removed, converted to VARCHAR"}
+
 
 @router.get("/labs", response_model=List[LabSchema])
 def list_labs(
@@ -17,7 +52,7 @@ def list_labs(
     skip: int = 0,
     limit: int = 200,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     q = db.query(Lab)
     if status:
@@ -41,14 +76,14 @@ def create_lab(
     lab = Lab(**data.model_dump())
     db.add(lab)
     db.flush()
-    log_activity(db, current_user.id, "crear", "lab", lab.id, data.model_dump())
+    log_activity(db, current_user.id, "crear", "lab", lab.id, data.model_dump(mode='json'))
     db.commit()
     db.refresh(lab)
     return lab
 
 
 @router.get("/labs/{lab_id}", response_model=LabSchema)
-def get_lab(lab_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_lab(lab_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     l = db.query(Lab).filter(Lab.id == lab_id).first()
     if not l:
         raise HTTPException(404, "Lab not found")
@@ -68,7 +103,7 @@ def update_lab(
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(l, k, v)
     db.flush()
-    log_activity(db, current_user.id, "actualizar", "lab", l.id, data.model_dump(exclude_unset=True))
+    log_activity(db, current_user.id, "actualizar", "lab", l.id, data.model_dump(mode='json', exclude_unset=True))
     db.commit()
     db.refresh(l)
     return l

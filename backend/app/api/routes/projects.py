@@ -66,10 +66,12 @@ def create_project(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
+    if not data.created_by_id:
+        data.created_by_id = current_user.id
     p = Project(**data.model_dump())
     db.add(p)
     db.flush()
-    log_activity(db, current_user.id, "crear", "project", p.id, data.model_dump())
+    log_activity(db, current_user.id, "crear", "project", p.id, data.model_dump(mode='json'))
     db.commit()
     db.refresh(p)
     return p
@@ -77,7 +79,13 @@ def create_project(
 
 @router.get("/projects/{project_id}", response_model=ProjectSchema)
 def get_project(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    p = db.query(Project).filter(Project.id == project_id).first()
+    q = db.query(Project).filter(Project.id == project_id)
+    if not is_admin(current_user):
+        if current_user.developer:
+            q = q.join(ProjectDeveloper).filter(ProjectDeveloper.developer_id == current_user.developer.id)
+        else:
+            q = q.filter(Project.id == 0)
+    p = q.first()
     if not p:
         raise HTTPException(404, "Project not found")
     return p
@@ -96,7 +104,7 @@ def update_project(
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(p, k, v)
     db.flush()
-    log_activity(db, current_user.id, "actualizar", "project", p.id, data.model_dump(exclude_unset=True))
+    log_activity(db, current_user.id, "actualizar", "project", p.id, data.model_dump(mode='json', exclude_unset=True))
     db.commit()
     db.refresh(p)
     return p
@@ -134,7 +142,7 @@ def add_developer_to_project(
     pd.project_id = project_id
     db.add(pd)
     db.flush()
-    log_activity(db, current_user.id, "crear", "project_developer", pd.id, {"project_id": project_id, **data.model_dump()})
+    log_activity(db, current_user.id, "crear", "project_developer", pd.id, {"project_id": project_id, **data.model_dump(mode='json')})
     db.commit()
     return {"message": "Developer added"}
 
@@ -202,7 +210,7 @@ def create_task(
     t.created_by_id = current_user.id
     db.add(t)
     db.flush()
-    log_activity(db, current_user.id, "crear", "task", t.id, data.model_dump())
+    log_activity(db, current_user.id, "crear", "task", t.id, data.model_dump(mode='json'))
     _recalc_project_progress(db, t.project_id)
     db.commit()
     db.refresh(t)
@@ -211,7 +219,10 @@ def create_task(
 
 @router.get("/tasks/{task_id}", response_model=TaskSchema)
 def get_task(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
-    t = db.query(Task).filter(Task.id == task_id).first()
+    q = db.query(Task).filter(Task.id == task_id)
+    if not is_admin(current_user):
+        q = q.filter(Task.assigned_to_id == current_user.id)
+    t = q.first()
     if not t:
         raise HTTPException(404, "Task not found")
     return t
@@ -222,32 +233,51 @@ def update_task(
     task_id: int,
     data: TaskUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     t = db.query(Task).filter(Task.id == task_id).first()
     if not t:
         raise HTTPException(404, "Task not found")
 
-    if not is_admin(current_user):
-        if t.assigned_to_id != current_user.id:
-            raise HTTPException(403, "Acceso denegado — No tienes permisos para editar esta tarea")
-        # Usuarios básicos solo pueden cambiar estado, progreso, comentarios y adjuntos de sus tareas
-        allowed_fields = {"status", "progress_percentage", "comments", "attachments", "actual_hours"}
-        for k in data.model_dump(exclude_unset=True).keys():
-            if k not in allowed_fields:
-                raise HTTPException(403, f"Acceso denegado — No puedes modificar el campo: {k}")
-
+    if "status" in data.model_dump(exclude_unset=True) and data.status == "finalizado":
+        if not is_admin(current_user):
+            raise HTTPException(403, "Only Admin or Jefe de Desarrollo can finalize tasks. Use the specific finalize endpoint.")
+    
     old_project_id = t.project_id
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(t, k, v)
     db.flush()
-    log_activity(db, current_user.id, "actualizar", "task", t.id, data.model_dump(exclude_unset=True))
+    log_activity(db, current_user.id, "actualizar", "task", t.id, data.model_dump(mode='json', exclude_unset=True))
     _recalc_project_progress(db, old_project_id)
     if t.project_id != old_project_id:
         _recalc_project_progress(db, t.project_id)
     db.commit()
     db.refresh(t)
     return t
+
+
+@router.get("/tasks_migrate_v2_debug")
+def migrate_tasks_debug(db: Session = Depends(get_db)):
+    from sqlalchemy import text
+    results = []
+    
+    queries = [
+        "ALTER TABLE tasks ADD COLUMN approved_by_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE tasks ADD COLUMN completed_at TIMESTAMP WITH TIME ZONE",
+        "ALTER TABLE tasks ADD COLUMN total_time_spent FLOAT DEFAULT 0.0",
+        "ALTER TABLE tasks ADD COLUMN history JSON DEFAULT '[]'::json"
+    ]
+    
+    for q in queries:
+        try:
+            db.execute(text(q))
+            db.commit()
+            results.append(f"SUCCESS: {q}")
+        except Exception as e:
+            db.rollback()
+            results.append(f"ERROR: {str(e)}")
+            
+    return {"results": results}
 
 
 @router.patch("/tasks/{task_id}/status")
@@ -260,18 +290,60 @@ def update_task_status(
     t = db.query(Task).filter(Task.id == task_id).first()
     if not t:
         raise HTTPException(404, "Task not found")
-    
+        
+    from ..core.security import is_admin
     if not is_admin(current_user) and t.assigned_to_id != current_user.id:
-        raise HTTPException(403, "Not enough permissions to edit this task")
+        raise HTTPException(status_code=403, detail="Not authorized to update this task's status")
+
+    if status == "finalizado" and not is_admin(current_user):
+        raise HTTPException(status_code=403, detail="Only Admin or Jefe de Desarrollo can finalize tasks.")
 
     t.status = status
     if status == "finalizado":
         t.progress_percentage = 100
+        t.approved_by_id = current_user.id
+        from datetime import datetime
+        t.completed_at = datetime.utcnow()
+        if t.start_date:
+            # We can calculate total_time_spent if we want, or just leave it.
+            pass
+        
+        hist = list(t.history) if getattr(t, 'history', None) is not None else []
+        hist.append({"event": "finalized", "by": current_user.id, "at": datetime.utcnow().isoformat()})
+        t.history = hist
+
     db.flush()
     log_activity(db, current_user.id, "actualizar", "task", t.id, {"status": status})
     _recalc_project_progress(db, t.project_id)
     db.commit()
     return {"message": "Status updated"}
+
+@router.post("/tasks/{task_id}/finalize")
+def finalize_task(
+    task_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin)
+):
+    t = db.query(Task).filter(Task.id == task_id).first()
+    if not t:
+        raise HTTPException(404, "Task not found")
+        
+    t.status = "finalizado"
+    t.progress_percentage = 100
+    t.approved_by_id = current_user.id
+    
+    from datetime import datetime
+    t.completed_at = datetime.utcnow()
+    
+    hist = list(t.history) if getattr(t, 'history', None) is not None else []
+    hist.append({"event": "finalized", "by": current_user.id, "at": datetime.utcnow().isoformat()})
+    t.history = hist
+    
+    db.flush()
+    log_activity(db, current_user.id, "finalizar", "task", t.id, {"status": "finalizado"})
+    _recalc_project_progress(db, t.project_id)
+    db.commit()
+    return {"message": "Task finalized successfully"}
 
 
 @router.delete("/tasks/{task_id}")

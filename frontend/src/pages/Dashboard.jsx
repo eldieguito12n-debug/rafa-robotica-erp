@@ -16,7 +16,7 @@ import { getStatusBadge as getSB } from '../lib/utils';
 
 export default function Dashboard() {
   const { addToast } = useAppData();
-  const { user } = useAuth();
+  const { isAdmin, user } = useAuth();
   const [stats, setStats] = useState(null);
   const [loading, setLoading] = useState(true);
   const [projects, setProjects] = useState([]);
@@ -60,16 +60,24 @@ export default function Dashboard() {
     })();
   }, [period]);
 
-  const kpis = useMemo(() => stats ? [
-    { title: 'Proyectos Activos', value: stats.active_projects, icon: FaProjectDiagram, color: 'primary', trend: true, trendValue: '+18%', subtitle: 'vs mes anterior' },
-    { title: 'Proyectos Terminados', value: stats.completed_projects, icon: FaCheckCircle, color: 'green', trend: true, trendValue: '+24%', subtitle: 'Exitoso' },
-    { title: 'Desarrolladores', value: stats.connected_developers, icon: FaUsers, color: 'cyan', trend: true, trendValue: '+5', subtitle: 'Equipo conectado' },
-    { title: 'Tareas Pendientes', value: stats.pending_tasks, icon: FaTasks, color: 'purple', trend: false, trendValue: '-3%', subtitle: 'En seguimiento' },
-    { title: 'Horas Trabajadas', value: Math.round(stats.hours_worked), icon: FaClock, color: 'yellow', trend: true, trendValue: '+15%', subtitle: 'Este mes' },
-    { title: 'Ventas del Mes', value: stats.monthly_sales, icon: FaDollarSign, color: 'green', trend: true, trendValue: '+32%', subtitle: 'Objetivo 78%', currency: true },
-    { title: 'Gastos del Mes', value: stats.monthly_expenses, icon: FaArrowDown, color: 'red', trend: false, trendValue: '-8%', subtitle: 'Ahorro detectado', currency: true },
-    { title: 'Utilidad Neta', value: stats.monthly_profit, icon: FaChartLine, color: 'primary', trend: true, trendValue: '+41%', subtitle: 'Margen saludable', currency: true },
-  ] : [], [stats]);
+  const kpis = useMemo(() => {
+    if (!stats) return [];
+    let base = [
+      { title: 'Proyectos Activos', value: stats.active_projects, icon: FaProjectDiagram, color: 'primary', trend: true, trendValue: '+18%', subtitle: 'vs mes anterior' },
+      { title: 'Proyectos Terminados', value: stats.completed_projects, icon: FaCheckCircle, color: 'green', trend: true, trendValue: '+24%', subtitle: 'Exitoso' },
+      { title: 'Desarrolladores', value: stats.connected_developers, icon: FaUsers, color: 'cyan', trend: true, trendValue: '+5', subtitle: 'Equipo conectado' },
+      { title: 'Tareas Pendientes', value: stats.pending_tasks, icon: FaTasks, color: 'purple', trend: false, trendValue: '-3%', subtitle: 'En seguimiento' },
+      { title: 'Horas Trabajadas', value: Math.round(stats.hours_worked), icon: FaClock, color: 'yellow', trend: true, trendValue: '+15%', subtitle: 'Este mes' },
+    ];
+    if (isAdmin()) {
+      base.push(
+        { title: 'Ventas del Mes', value: stats.monthly_sales, icon: FaDollarSign, color: 'green', trend: true, trendValue: '+32%', subtitle: 'Objetivo 78%', currency: true },
+        { title: 'Gastos del Mes', value: stats.monthly_expenses, icon: FaArrowDown, color: 'red', trend: false, trendValue: '-8%', subtitle: 'Ahorro detectado', currency: true },
+        { title: 'Utilidad Neta', value: stats.monthly_profit, icon: FaChartLine, color: 'primary', trend: true, trendValue: '+41%', subtitle: 'Margen saludable', currency: true },
+      );
+    }
+    return base;
+  }, [stats, isAdmin]);
 
   if (loading) {
     return (
@@ -139,6 +147,7 @@ export default function Dashboard() {
       </div>
 
       {/* Charts Row 1 */}
+      {isAdmin() && (
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
         <motion.div
           initial={{ opacity: 0, x: -10 }} whileInView={{ opacity: 1, x: 0 }} viewport={{ once: true }}
@@ -196,6 +205,7 @@ export default function Dashboard() {
           />
         </motion.div>
       </div>
+      )}
 
       {/* Row: Projects + Inventory Alerts + Labs */}
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">

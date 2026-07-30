@@ -1,9 +1,10 @@
-from fastapi import FastAPI
+from fastapi import FastAPI, Depends
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import JSONResponse
+from sqlalchemy.orm import Session
 from .core.config import settings
-from .core.database import engine, Base
+from .core.database import engine, Base, get_db
 from .api import api_router
 from .models import *
 
@@ -16,6 +17,29 @@ app = FastAPI(
     docs_url="/docs",
     redoc_url="/redoc",
 )
+
+@app.get("/api/v1/migrate_db")
+def migrate_db(db: Session = Depends(get_db)):
+    from sqlalchemy import text
+    results = []
+    
+    queries = [
+        "ALTER TABLE tasks ADD COLUMN approved_by_id INTEGER REFERENCES users(id)",
+        "ALTER TABLE tasks ADD COLUMN completed_at TIMESTAMP WITH TIME ZONE",
+        "ALTER TABLE tasks ADD COLUMN total_time_spent FLOAT DEFAULT 0.0",
+        "ALTER TABLE tasks ADD COLUMN history JSON DEFAULT '[]'::json"
+    ]
+    
+    for q in queries:
+        try:
+            db.execute(text(q))
+            db.commit()
+            results.append(f"SUCCESS: {q}")
+        except Exception as e:
+            db.rollback()
+            results.append(f"ERROR: {str(e)}")
+            
+    return {"results": results}
 
 app.add_middleware(
     CORSMiddleware,
@@ -49,16 +73,8 @@ from sqlalchemy import text
 def health_check():
     return {"status": "ok", "version": "1.0.0"}
 
-@app.get("/api/v1/fix_role")
-def fix_role():
-    from .core.database import engine
-    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
-        try:
-            conn.execute(text("ALTER TABLE users ALTER COLUMN role TYPE varchar(50) USING role::varchar;"))
-            conn.execute(text("DROP TYPE IF EXISTS userrole CASCADE;"))
-            return {"status": "success", "message": "Role converted to varchar"}
-        except Exception as e:
-            return {"status": "error", "message": str(e)}
+
+
 
 
 @app.get("/health", tags=["Health"])

@@ -83,7 +83,7 @@ export default function AIAssistant() {
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 40, scale: 0.95 }}
             transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-            className="fixed bottom-6 right-6 z-50 w-[95vw] md:w-[520px] h-[70vh] max-h-[650px] glass rounded-3xl border border-primary-500/30 shadow-glow-blue overflow-hidden hud-corner"
+            className="fixed bottom-0 right-0 md:bottom-4 md:right-4 z-50 w-full md:w-[750px] lg:w-[850px] xl:w-[950px] h-[100dvh] md:h-[92vh] max-h-[1000px] flex flex-col bg-dark-950/95 backdrop-blur-xl rounded-t-3xl md:rounded-3xl border-t md:border border-primary-500/30 shadow-[0_0_40px_rgba(0,194,255,0.15)] overflow-hidden hud-corner"
           >
             <div className="p-4 border-b border-dark-600/60 flex items-center gap-3 bg-gradient-to-r from-primary-600/20 via-dark-800 to-neon-green/10">
               <div className="relative">
@@ -112,7 +112,7 @@ export default function AIAssistant() {
               </button>
             </div>
 
-            <div ref={scrollRef} className="flex-1 h-[calc(100%-170px)] overflow-y-auto p-4 space-y-4">
+            <div ref={scrollRef} className="flex-1 overflow-y-auto p-4 space-y-4">
               {messages.map((m, i) => (
                 <motion.div
                   key={i}
@@ -179,7 +179,7 @@ export default function AIAssistant() {
               )}
             </div>
 
-            <div className="p-3 border-t border-dark-600/60 space-y-2 bg-dark-800/40">
+            <div className="shrink-0 p-3 border-t border-dark-600/60 space-y-2 bg-dark-800/40">
               <div className="flex flex-wrap gap-1.5">
                 {quickPrompts.map((p, i) => {
                   const Icon = p.icon;

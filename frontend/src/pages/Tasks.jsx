@@ -1,17 +1,29 @@
 import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import {
-  FaSearch, FaPlus, FaTasks, FaFilter, FaEdit, FaTrash, FaCalendarAlt,
-  FaComment, FaPaperclip, FaFlag, FaUser, FaProjectDiagram, FaEllipsisV,
-} from 'react-icons/fa';
-import { tasksAPI } from '../lib/api';
-import { cn, formatDate, getStatusBadge } from '../lib/utils';
+import { FaSearch, FaPlus, FaTasks, FaFilter, FaEdit, FaTrash, FaCalendarAlt, FaComment, FaPaperclip, FaFlag, FaUser, FaProjectDiagram, FaEllipsisV, FaCheckCircle, FaHistory } from 'react-icons/fa';
+import { tasksAPI, projectsAPI, usersAPI } from '../lib/api';
+import { cn, formatDate, formatDateTime } from '../lib/utils';
 import Avatar from '../components/ui/Avatar.jsx';
 import { useAuth } from '../context/AuthContext';
+import { useAppData } from '../context/AppDataContext';
 import RoleGuard from '../components/ui/RoleGuard.jsx';
 
 const statuses = ['','pendiente','en_proceso','en_pruebas','finalizado','pausado','cancelado'];
 const priorities = ['','baja','media','alta','urgente','critica'];
+
+const getTaskStatusBadge = (status, overdue) => {
+  if (status === 'finalizado') return 'bg-neon-green/10 text-neon-green border-neon-green/30';
+  if (overdue) return 'bg-red-500/10 text-red-400 border-red-500/30 font-bold';
+  if (status === 'en_proceso') return 'bg-neon-blue/10 text-neon-blue border-neon-blue/30';
+  return 'bg-neon-yellow/10 text-neon-yellow border-neon-yellow/30';
+};
+
+const getTaskStatusIcon = (status, overdue) => {
+  if (status === 'finalizado') return '🟢';
+  if (overdue) return '🔴';
+  if (status === 'en_proceso') return '🔵';
+  return '🟡';
+};
 
 const priorityColors = {
   baja: 'bg-neon-green/10 text-neon-green border-neon-green/30',
@@ -23,6 +35,7 @@ const priorityColors = {
 
 export default function Tasks() {
   const { isAdmin, user } = useAuth();
+  const { addToast } = useAppData();
   const admin = isAdmin();
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -47,16 +60,27 @@ export default function Tasks() {
     assigned_to_id: '',
   });
 
+  const [projects, setProjects] = useState([]);
+  const [users, setUsers] = useState([]);
+
   const load = async () => {
     setLoading(true);
     try {
-      const res = await tasksAPI.list({
-        status: status || undefined,
-        priority: priority || undefined,
-        limit: 100,
-      });
-      setTasks(res.data);
-    } catch {} finally { setLoading(false); }
+      const [resTasks, resProj, resUsers] = await Promise.all([
+        tasksAPI.list({
+          status: status || undefined,
+          priority: priority || undefined,
+          limit: 100,
+        }),
+        projectsAPI.list({ limit: 100 }),
+        usersAPI.list({ limit: 1000 })
+      ]);
+      setTasks(resTasks.data);
+      setProjects(resProj.data);
+      setUsers(resUsers.data);
+    } catch (err) {
+      console.error(err);
+    } finally { setLoading(false); }
   };
 
   useEffect(() => { load(); }, [status, priority]);
@@ -66,7 +90,7 @@ export default function Tasks() {
     setForm({
       title: '',
       description: '',
-      project_id: 1,
+      project_id: '',
       priority: 'media',
       status: 'pendiente',
       start_date: '',
@@ -76,6 +100,31 @@ export default function Tasks() {
     });
     setShowNew(true);
   };
+
+  const handleDelete = async (t) => {
+    if (!confirm(`¿Eliminar tarea "${t.title}"?`)) return;
+    try {
+      await tasksAPI.remove(t.id);
+      addToast('Tarea eliminada correctamente', 'success');
+      load();
+    } catch (err) {
+      addToast(err.response?.data?.detail || 'Error eliminando tarea', 'error');
+      console.error(err);
+    }
+  };
+
+  const handleFinalize = async (t) => {
+    if (!confirm(`¿Estás seguro de marcar la tarea "${t.title}" como finalizada?`)) return;
+    try {
+      await tasksAPI.finalize(t.id);
+      addToast('Tarea finalizada exitosamente', 'success');
+      load();
+    } catch (err) {
+      addToast(err.response?.data?.detail || 'Error al finalizar tarea', 'error');
+    }
+  };
+
+  const [selectedTaskHistory, setSelectedTaskHistory] = useState(null);
 
   const mock = [
     { id: 1, title: 'Diseñar chasis del robot autónomo v2', project_id: 1, project_name: 'Robot Autónomo', assigned_to_name: 'Esteban López', created_by_id: 2, priority: 'alta', status: 'finalizado', progress_percentage: 100, due_date: '2025-02-10', estimated_hours: 24, actual_hours: 22, description: 'Diseño CAD del chasis principal con materiales ligeros' },
@@ -89,9 +138,9 @@ export default function Tasks() {
     { id: 9, title: 'Integración cámara térmica drone', project_id: 5, project_name: 'Drone Inspección', assigned_to_name: 'Diana Torres', priority: 'media', status: 'pausado', progress_percentage: 20, due_date: '2025-09-15', estimated_hours: 40, actual_hours: 8 },
     { id: 10, title: 'Tests de batería y autonomía', project_id: 1, project_name: 'Robot Autónomo', assigned_to_name: 'Fernanda Gómez', priority: 'media', status: 'pendiente', progress_percentage: 0, due_date: '2025-08-20', estimated_hours: 24, actual_hours: 0 },
   ];
-  const list = (tasks.length ? tasks.map(t => ({
+  const list = tasks.map(t => ({
     ...t, project_name: `Proyecto #${t.project_id}`, assigned_to_name: t.assigned_to_id ? `Usuario #${t.assigned_to_id}` : 'Sin asignar',
-  })) : mock).filter(t =>
+  })).filter(t =>
     (!search || t.title.toLowerCase().includes(search.toLowerCase()) || (t.project_name || '').toLowerCase().includes(search.toLowerCase())) &&
     (!status || t.status === status) &&
     (!priority || t.priority === priority)
@@ -208,15 +257,24 @@ export default function Tasks() {
                           <span className="text-xs font-mono w-9 text-right">{t.progress_percentage}%</span>
                         </div>
                       </td>
-                      <td className="py-3 px-4"><span className={getStatusBadge(t.status)}>{String(t.status).replace(/_/g,' ')}</span></td>
+                      <td className="py-3 px-4">
+                        <span className={`px-2.5 py-1 rounded-lg border ${getTaskStatusBadge(t.status, overdue)}`}>
+                          {getTaskStatusIcon(t.status, overdue)} {overdue ? 'Atrasada' : String(t.status).replace(/_/g,' ')}
+                        </span>
+                      </td>
                       <td className="py-3 px-4">
                         <div className="flex items-center justify-end gap-1">
+                          <button onClick={() => setSelectedTaskHistory(t)} className="w-7 h-7 rounded-lg hover:bg-dark-500/15 text-dark-300 flex items-center justify-center" title="Ver Historial"><FaHistory size={11} /></button>
+                          
                           <RoleGuard adminOnly>
+                            {t.status !== 'finalizado' && (
+                              <button onClick={() => handleFinalize(t)} className="w-7 h-7 rounded-lg hover:bg-neon-green/15 text-neon-green flex items-center justify-center" title="Finalizar tarea"><FaCheckCircle size={11} /></button>
+                            )}
                             <button className="w-7 h-7 rounded-lg hover:bg-primary-500/15 text-primary-400 flex items-center justify-center" title="Editar"><FaEdit size={11} /></button>
-                            <button className="w-7 h-7 rounded-lg hover:bg-red-500/15 text-red-400 flex items-center justify-center" title="Eliminar"><FaTrash size={11} /></button>
+                            <button onClick={(e) => { e.preventDefault(); handleDelete(t); }} className="w-7 h-7 rounded-lg hover:bg-red-500/15 text-red-400 flex items-center justify-center" title="Eliminar"><FaTrash size={11} /></button>
                           </RoleGuard>
                           {!admin && t.assigned_to_id === user?.id && (
-                            <button className="w-7 h-7 rounded-lg hover:bg-primary-500/15 text-primary-400 flex items-center justify-center" title="Ver / Actualizar estado"><FaEdit size={11} /></button>
+                            <button className="w-7 h-7 rounded-lg hover:bg-primary-500/15 text-primary-400 flex items-center justify-center" title="Ver / Actualizar progreso"><FaEdit size={11} /></button>
                           )}
                         </div>
                       </td>
@@ -232,7 +290,9 @@ export default function Tasks() {
           {list.map((t, i) => (
             <motion.div key={t.id} initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i*0.03 }} className="card hud-corner hover:shadow-glow-blue transition-all">
               <div className="flex items-start justify-between gap-2 mb-3">
-                <span className={getStatusBadge(t.status)}>{String(t.status).replace(/_/g,' ')}</span>
+                <span className={`px-2 py-0.5 rounded border text-[10px] ${getTaskStatusBadge(t.status, t.due_date && t.status !== 'finalizado' && new Date(t.due_date) < new Date())}`}>
+                  {getTaskStatusIcon(t.status, t.due_date && t.status !== 'finalizado' && new Date(t.due_date) < new Date())} {t.due_date && t.status !== 'finalizado' && new Date(t.due_date) < new Date() ? 'Atrasada' : String(t.status).replace(/_/g,' ')}
+                </span>
                 <span className={`${getStatusBadge(t.priority)} !text-[10px]`}>{t.priority.toUpperCase()}</span>
               </div>
               <h4 className="font-bold text-base mb-2 line-clamp-2">{t.title}</h4>
@@ -247,6 +307,15 @@ export default function Tasks() {
               <div className="flex items-center justify-between text-xs text-dark-400 border-t border-dark-600/40 pt-3">
                 <div className="flex items-center gap-1.5"><FaCalendarAlt size={10} /> {formatDate(t.due_date) || 'Sin fecha'}</div>
                 <div className="flex items-center gap-1.5"><FaUser size={10} /> {t.assigned_to_name?.split(' ')[0] || 'Sin asignar'}</div>
+              </div>
+              <div className="flex items-center gap-1.5 justify-end mt-2 pt-2 border-t border-dark-600/20">
+                <button onClick={() => setSelectedTaskHistory(t)} className="text-dark-300 hover:text-white text-xs font-semibold flex items-center gap-1"><FaHistory size={10}/> Historial</button>
+                <RoleGuard adminOnly>
+                  {t.status !== 'finalizado' && (
+                    <button onClick={() => handleFinalize(t)} className="text-neon-green hover:text-green-300 text-xs font-semibold flex items-center gap-1 ml-2"><FaCheckCircle size={10}/> Finalizar</button>
+                  )}
+                  <button onClick={() => handleDelete(t)} className="text-red-400 hover:text-red-300 text-xs font-semibold flex items-center gap-1 ml-2"><FaTrash size={10}/> Eliminar</button>
+                </RoleGuard>
               </div>
             </motion.div>
           ))}
@@ -266,16 +335,20 @@ export default function Tasks() {
                 await tasksAPI.create({
                   title: form.title,
                   description: form.description,
-                  project_id: Number(form.project_id),
+                  project_id: form.project_id ? Number(form.project_id) : null,
                   priority: form.priority,
                   status: form.status,
                   assigned_to_id: form.assigned_to_id || null,
                   progress_percentage: 0,
+                  start_date: form.start_date || null,
+                  due_date: form.due_date || null,
                   estimated_hours: Number(form.estimated_hours)
                 });
                 setShowNew(false);
+                addToast('Tarea creada exitosamente', 'success');
                 load();
               } catch (err) {
+                addToast(err.response?.data?.detail || 'Error creando tarea', 'error');
                 console.error(err);
               } finally {
                 setSaving(false);
@@ -289,17 +362,23 @@ export default function Tasks() {
                 <div>
                   <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Proyecto</label>
                   <select value={form.project_id} onChange={e => setForm({ ...form, project_id: e.target.value })} className="input-field">
-                    <option value="1">Robot Autónomo</option>
-                    <option value="2">Sistema IoT Agrícola</option>
-                    <option value="3">Brazo 6DOF</option>
+                    <option value="">Selecciona un proyecto</option>
+                    {projects.map(p => (
+                      <option key={p.id} value={p.id}>{p.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Asignar A (ID Usuario)</label>
-                  <input type="number" value={form.assigned_to_id || ''} onChange={e => setForm({ ...form, assigned_to_id: e.target.value ? Number(e.target.value) : null })} className="input-field" placeholder="ID del usuario (Opcional)" />
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Asignar A (Opcional)</label>
+                  <select value={form.assigned_to_id || ''} onChange={e => setForm({ ...form, assigned_to_id: e.target.value ? Number(e.target.value) : null })} className="input-field">
+                    <option value="">Sin Asignar</option>
+                    {users.map(u => (
+                      <option key={u.id} value={u.id}>{u.full_name} ({String(u.role).replace(/_/g, ' ')})</option>
+                    ))}
+                  </select>
                 </div>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-4">
                 <div>
                   <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Prioridad</label>
                   <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} className="input-field">
@@ -308,6 +387,14 @@ export default function Tasks() {
                     <option value="alta">Alta</option>
                     <option value="urgente">Urgente</option>
                   </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Inicio (Opcional)</label>
+                  <input type="date" value={form.start_date} onChange={e => setForm({ ...form, start_date: e.target.value })} className="input-field" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Vence (Opcional)</label>
+                  <input type="date" value={form.due_date} onChange={e => setForm({ ...form, due_date: e.target.value })} className="input-field" />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -335,6 +422,62 @@ export default function Tasks() {
           </motion.div>
         </div>
       )}
+
+      {selectedTaskHistory && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-sm" onClick={() => setSelectedTaskHistory(null)} />
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-lg w-full mx-auto p-6 shadow-glass relative z-10">
+            <div className="flex justify-between items-start mb-4">
+              <div>
+                <h3 className="text-xl font-bold heading-glow">Historial de la Tarea</h3>
+                <p className="text-sm text-dark-400">{selectedTaskHistory.title}</p>
+              </div>
+              <button onClick={() => setSelectedTaskHistory(null)} className="text-dark-400 hover:text-white">&times;</button>
+            </div>
+            <div className="space-y-4 max-h-[60vh] overflow-y-auto pr-2">
+              <div className="p-3 bg-dark-800/50 rounded-xl border border-dark-600/30 text-sm">
+                <div className="text-xs text-dark-400 mb-1">Responsable asignado:</div>
+                <div className="font-semibold">{selectedTaskHistory.assigned_to_name}</div>
+              </div>
+              
+              <div className="relative pl-4 border-l-2 border-dark-600/50 space-y-4 py-2">
+                <div className="relative">
+                  <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-dark-400"></div>
+                  <div className="text-xs text-dark-400">{formatDateTime(selectedTaskHistory.created_at)}</div>
+                  <div className="font-medium text-sm">Tarea Creada</div>
+                  <div className="text-xs text-dark-500">Por {selectedTaskHistory.created_by_id ? `Usuario #${selectedTaskHistory.created_by_id}` : 'Sistema'}</div>
+                </div>
+
+                {(selectedTaskHistory.history || []).map((ev, i) => (
+                  <div key={i} className="relative">
+                    <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-neon-blue"></div>
+                    <div className="text-xs text-dark-400">{formatDateTime(ev.at)}</div>
+                    <div className="font-medium text-sm">
+                      {ev.event === 'finalized' ? 'Tarea Finalizada' : ev.event}
+                    </div>
+                    <div className="text-xs text-dark-500">
+                      Por Usuario #{ev.by}
+                    </div>
+                  </div>
+                ))}
+
+                {selectedTaskHistory.status === 'finalizado' && !selectedTaskHistory.history?.length && selectedTaskHistory.completed_at && (
+                  <div className="relative">
+                    <div className="absolute -left-[21px] top-1 w-2.5 h-2.5 rounded-full bg-neon-green"></div>
+                    <div className="text-xs text-dark-400">{formatDateTime(selectedTaskHistory.completed_at)}</div>
+                    <div className="font-medium text-sm">Tarea Aprobada y Finalizada</div>
+                    <div className="text-xs text-dark-500">Por Usuario #{selectedTaskHistory.approved_by_id}</div>
+                  </div>
+                )}
+              </div>
+            </div>
+            <div className="mt-5 flex justify-end">
+              <button onClick={() => setSelectedTaskHistory(null)} className="btn-secondary">Cerrar</button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+
     </div>
   );
 }
