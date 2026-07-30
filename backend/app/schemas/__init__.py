@@ -64,6 +64,7 @@ class Developer(DeveloperBase):
     performance_score: float = 0.0
     compliance_percentage: float = 0.0
     created_at: Optional[datetime] = None
+    user: Optional[User] = None
 
     class Config:
         from_attributes = True
