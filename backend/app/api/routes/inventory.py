@@ -1,8 +1,12 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 from typing import Optional, List
+from io import BytesIO
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
+from ...core.activity_middleware import log_activity
+from ...core.qr_code import generate_qr_bytes
 from ...models import InventoryItem, InventoryMovement, User
 from ...schemas import InventoryItem as InventorySchema, InventoryItemCreate, InventoryItemUpdate
 
@@ -38,6 +42,8 @@ def create_inventory_item(
     item = InventoryItem(**data.model_dump())
     item.low_stock_alert = item.quantity <= item.min_stock
     db.add(item)
+    db.flush()
+    log_activity(db, current_user.id, "crear", "inventory_item", item.id, data.model_dump())
     db.commit()
     db.refresh(item)
     return item
@@ -49,6 +55,26 @@ def get_inventory_item(item_id: int, db: Session = Depends(get_db), current_user
     if not item:
         raise HTTPException(404, "Item not found")
     return item
+
+
+@router.get("/inventory/{item_id}/qr")
+def download_inventory_qr(
+    item_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
+    if not item:
+        raise HTTPException(404, "Item not found")
+    code = item.sku or ""
+    qr_text = f"{item_id}:{code}:{item.name}"
+    qr_bytes = generate_qr_bytes(qr_text, box_size=5)
+    filename = f"qr_item_{item_id}.png"
+    return StreamingResponse(
+        BytesIO(qr_bytes),
+        media_type="image/png",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )
 
 
 @router.put("/inventory/{item_id}", response_model=InventorySchema)
@@ -64,6 +90,8 @@ def update_inventory_item(
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(item, k, v)
     item.low_stock_alert = item.quantity <= item.min_stock
+    db.flush()
+    log_activity(db, current_user.id, "actualizar", "inventory_item", item.id, data.model_dump(exclude_unset=True))
     db.commit()
     db.refresh(item)
     return item
@@ -91,6 +119,8 @@ def move_inventory(
     item.low_stock_alert = item.quantity <= item.min_stock
     mv = InventoryMovement(item_id=item_id, type=movement_type, quantity=quantity, reference=reference, notes=notes, user_id=current_user.id)
     db.add(mv)
+    db.flush()
+    log_activity(db, current_user.id, "actualizar", "inventory_item", item.id, {"movement_type": movement_type, "quantity": quantity, "reference": reference})
     db.commit()
     return {"message": "Movement registered", "new_quantity": item.quantity}
 
@@ -104,6 +134,7 @@ def delete_inventory_item(
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(404, "Item not found")
+    log_activity(db, current_user.id, "eliminar", "inventory_item", item.id, {"name": item.name, "sku": item.sku})
     db.delete(item)
     db.commit()
     return {"message": "Item deleted"}

@@ -1,32 +1,140 @@
-import { useState } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { FaQuoteLeft, FaSearch, FaPlus, FaFilePdf, FaQrcode, FaFileExport, FaCheck, FaTimes, FaCalendarAlt, FaDollarSign, FaUserFriends, FaPrint, FaEye } from 'react-icons/fa';
 import { cn, formatCurrency, formatDate, getStatusBadge } from '../lib/utils';
+import { financialAPI, clientsAPI } from '../lib/api';
+import { useAppData } from '../context/AppDataContext';
 
-const quotes = [
-  { id: 1, quote_number: 'COT-2025-0001', title: 'Plataforma IoT Monitoreo', client: 'AgroTech del Caribe', subtotal: 12500000, tax: 12, discount: 5, total: 13312500, date: '2025-07-15', valid_until: '2025-08-15', status: 'enviada', items_count: 8 },
-  { id: 2, quote_number: 'COT-2025-0002', title: 'Brazo Robótico 6DOF + Instalación', client: 'Constructora XXI', subtotal: 48000000, tax: 12, discount: 8, total: 48499200, date: '2025-07-20', valid_until: '2025-08-20', status: 'aprobada', items_count: 15 },
-  { id: 3, quote_number: 'COT-2025-0003', title: 'Drone Inspección Industrial', client: 'LogiMove Freight', subtotal: 28000000, tax: 12, discount: 0, total: 31360000, date: '2025-07-25', valid_until: '2025-08-25', status: 'borrador', items_count: 6 },
-  { id: 4, quote_number: 'COT-2025-0004', title: 'Sistema Detección Defectos IA', client: 'Industrias Andinas', subtotal: 32000000, tax: 12, discount: 10, total: 32256000, date: '2025-07-22', valid_until: '2025-08-22', status: 'pendiente', items_count: 12 },
-  { id: 5, quote_number: 'COT-2025-0005', title: 'Kit Capacitación Robótica (10 pers)', client: 'TechCorp Solutions', subtotal: 4500000, tax: 12, discount: 0, total: 5040000, date: '2025-07-28', valid_until: '2025-08-28', status: 'aprobada', items_count: 4 },
-  { id: 6, quote_number: 'COT-2025-0006', title: 'Solución Exoesqueleto Rehabilitación', client: 'HealthTech', subtotal: 72000000, tax: 12, discount: 7, total: 72835200, date: '2025-06-20', valid_until: '2025-07-20', status: 'vencida', items_count: 20 },
-  { id: 7, quote_number: 'COT-2025-0007', title: 'AGV Logística 5 Unidades', client: 'LogiMove Freight', subtotal: 96000000, tax: 12, discount: 12, total: 93849600, date: '2025-07-10', valid_until: '2025-08-10', status: 'rechazada', items_count: 10 },
-];
+const statusOptions = ['borrador', 'pendiente', 'enviada', 'aprobada', 'rechazada', 'vencida'];
+
+const emptyForm = {
+  client_id: '',
+  title: '',
+  valid_until: '',
+  subtotal: '',
+  tax: 19,
+  discount: 0,
+  total_amount: '',
+  notes: '',
+  status: 'borrador',
+};
 
 export default function Quotes() {
+  const { addToast } = useAppData();
   const [search, setSearch] = useState('');
+  const [quotes, setQuotes] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
+  const [processingId, setProcessingId] = useState(null);
+
+  const loadQuotes = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await financialAPI.quotes({ limit: 200 }).catch(() => ({ data: [] }));
+      setQuotes(Array.isArray(res.data) ? res.data : []);
+    } catch {
+      addToast('Error cargando cotizaciones', 'error');
+    } finally {
+      setLoading(false);
+    }
+  }, [addToast]);
+
+  const loadClients = async () => {
+    try {
+      const res = await clientsAPI.list({ limit: 200 }).catch(() => ({ data: [] }));
+      setClients(Array.isArray(res.data) ? res.data : []);
+    } catch {}
+  };
+
+  useEffect(() => {
+    loadQuotes();
+    loadClients();
+  }, [loadQuotes]);
+
   const list = quotes.filter(q =>
     !search || (q.title || '').toLowerCase().includes(search.toLowerCase()) ||
     (q.quote_number || '').toLowerCase().includes(search.toLowerCase()) ||
-    (q.client || '').toLowerCase().includes(search.toLowerCase())
+    (q.client_name || q.client || (clients.find(c => c.id === q.client_id)?.company_name) || '').toLowerCase().includes(search.toLowerCase())
   );
 
   const totals = {
     total: list.length,
-    value: list.reduce((a,b)=>a+b.total,0),
-    approved: list.filter(q => q.status === 'aprobada').length,
-    pending: list.filter(q => ['pendiente','enviada','borrador'].includes(q.status)).length,
+    value: list.reduce((a,b) => a + (Number(b.total_amount || b.total) || 0), 0),
+    approved: list.filter(q => (q.status || '') === 'aprobada').length,
+    pending: list.filter(q => ['pendiente','enviada','borrador'].includes(q.status || '')).length,
   };
+
+  const openNew = () => {
+    setForm(emptyForm);
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    try {
+      const payload = { ...form };
+      if (payload.client_id) payload.client_id = Number(payload.client_id);
+      if (payload.subtotal !== '') payload.subtotal = Number(payload.subtotal);
+      if (payload.tax !== '') payload.tax = Number(payload.tax);
+      if (payload.discount !== '') payload.discount = Number(payload.discount);
+      if (payload.total_amount !== '') payload.total_amount = Number(payload.total_amount);
+      await financialAPI.createQuote(payload);
+      addToast('Cotización creada', 'success');
+      setShowModal(false);
+      loadQuotes();
+    } catch (err) {
+      addToast(err?.response?.data?.detail || 'Error guardando cotización', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const handleApprove = async (q) => {
+    const convert = window.confirm('¿Aprobar cotización?\n\n¿Desea convertirla automáticamente en proyecto?\nAceptar = Convertir a Proyecto\nCancelar = Solo aprobar');
+    setProcessingId(q.id);
+    try {
+      await financialAPI.approveQuote(q.id, convert);
+      addToast(convert ? 'Cotización aprobada y convertida a proyecto' : 'Cotización aprobada', 'success');
+      loadQuotes();
+    } catch (err) {
+      addToast(err?.response?.data?.detail || 'Error al aprobar', 'error');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const handleReject = async (q) => {
+    if (!window.confirm('¿Rechazar esta cotización?')) return;
+    setProcessingId(q.id);
+    try {
+      await financialAPI.rejectQuote(q.id);
+      addToast('Cotización rechazada', 'success');
+      loadQuotes();
+    } catch (err) {
+      addToast(err?.response?.data?.detail || 'Error al rechazar', 'error');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
+  const getClientName = (q) => {
+    if (q.client_name) return q.client_name;
+    if (q.client) return q.client;
+    if (q.client_id) {
+      const c = clients.find(c => c.id === q.client_id);
+      if (c) return c.company_name || c.contact_person || `Cliente #${q.client_id}`;
+    }
+    return `Cliente #${q.client_id || '-'}`;
+  };
+
+  const getSubtotal = (q) => Number(q.subtotal) || 0;
+  const getTaxPercent = (q) => Number(q.tax) ?? 19;
+  const getDiscountPercent = (q) => Number(q.discount) ?? 0;
+  const getTotal = (q) => Number(q.total_amount || q.total) || 0;
 
   return (
     <div className="space-y-5">
@@ -46,7 +154,7 @@ export default function Quotes() {
             <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..." className="input-field !py-2 !pl-8 text-sm w-56" />
           </div>
           <button className="btn-secondary !px-3 !py-2 !text-sm"><FaFileExport size={12} /> Excel</button>
-          <button className="btn-primary !px-3 !py-2 !text-sm"><FaPlus size={12} /> Nueva Cotización</button>
+          <button className="btn-primary !px-3 !py-2 !text-sm" onClick={openNew}><FaPlus size={12} /> Nueva Cotización</button>
         </div>
       </motion.div>
 
@@ -58,52 +166,126 @@ export default function Quotes() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-        {list.map((q, i) => (
-          <motion.div key={q.id} initial={{ opacity: 0, y: 15 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i*0.04 }} className="card hud-corner hover:scale-[1.01] transition-transform relative overflow-hidden">
-            <div className="absolute top-0 right-0 p-4 opacity-10">
-              <FaQuoteLeft size={80} className="text-primary-500" />
-            </div>
-            <div className="relative">
-              <div className="flex items-start justify-between gap-2 mb-2">
-                <div>
-                  <div className="text-[10px] font-mono text-dark-500 uppercase tracking-wider">{q.quote_number}</div>
-                  <div className="font-bold text-lg truncate">{q.title}</div>
+        {loading && list.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-dark-500 text-sm">Cargando cotizaciones...</div>
+        ) : list.length === 0 ? (
+          <div className="col-span-full text-center py-12 text-dark-500 text-sm">No hay cotizaciones para mostrar</div>
+        ) : list.map((q, i) => {
+          const subtotal = getSubtotal(q);
+          const taxP = getTaxPercent(q);
+          const discP = getDiscountPercent(q);
+          const total = getTotal(q);
+          const ival = subtotal * taxP / 100;
+          const disc = subtotal * discP / 100;
+          return (
+            <motion.div key={q.id} initial={{ opacity: 0, y: 15 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} transition={{ delay: i*0.04 }} className={`card hud-corner hover:scale-[1.01] transition-transform relative overflow-hidden ${processingId === q.id ? 'animate-pulse' : ''}`}>
+              <div className="absolute top-0 right-0 p-4 opacity-10">
+                <FaQuoteLeft size={80} className="text-primary-500" />
+              </div>
+              <div className="relative">
+                <div className="flex items-start justify-between gap-2 mb-2">
+                  <div>
+                    <div className="text-[10px] font-mono text-dark-500 uppercase tracking-wider">{q.quote_number || `COT-${q.id}`}</div>
+                    <div className="font-bold text-lg truncate">{q.title}</div>
+                  </div>
+                  <span className={`${getStatusBadge(q.status)} shrink-0 capitalize`}>{q.status || 'borrador'}</span>
                 </div>
-                <span className={`${getStatusBadge(q.status)} shrink-0 capitalize`}>{q.status}</span>
-              </div>
 
-              <div className="space-y-1.5 text-xs mb-4 py-3 border-y border-dark-600/40">
-                <Row Ic={FaUserFriends} label="Cliente" value={q.client} />
-                <Row Ic={FaCalendarAlt} label="Creada" value={formatDate(q.date)} />
-                <Row Ic={FaCalendarAlt} label="Válida hasta" value={formatDate(q.valid_until)} highlight={new Date(q.valid_until) < new Date()} />
-                <Row Ic={FaDollarSign} label="Items" value={`${q.items_count} productos/servicios`} />
-              </div>
+                <div className="space-y-1.5 text-xs mb-4 py-3 border-y border-dark-600/40">
+                  <Row Ic={FaUserFriends} label="Cliente" value={getClientName(q)} />
+                  <Row Ic={FaCalendarAlt} label="Creada" value={formatDate(q.created_at || q.date)} />
+                  <Row Ic={FaCalendarAlt} label="Válida hasta" value={formatDate(q.valid_until)} highlight={new Date(q.valid_until) < new Date()} />
+                  <Row Ic={FaDollarSign} label="Items" value={`${q.items_count || q.items_count || 0} productos/servicios`} />
+                </div>
 
-              <div className="glass rounded-xl p-3 mb-4">
-                <div className="flex items-center justify-between text-xs text-dark-400"><span>Subtotal</span><span className="font-mono">{formatCurrency(q.subtotal)}</span></div>
-                <div className="flex items-center justify-between text-xs text-dark-400"><span>IVA (19%)</span><span className="font-mono">{formatCurrency(q.subtotal * 0.19)}</span></div>
-                {q.discount > 0 && <div className="flex items-center justify-between text-xs text-neon-green"><span>Descuento ({q.discount}%)</span><span className="font-mono">-{formatCurrency(q.subtotal * q.discount / 100)}</span></div>}
-                <div className="divider-gradient my-2" />
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-dark-300 uppercase tracking-wider">Total</span>
-                  <span className="font-mono font-black text-xl text-neon-green neon-text">{formatCurrency(q.total)}</span>
+                <div className="glass rounded-xl p-3 mb-4">
+                  <div className="flex items-center justify-between text-xs text-dark-400"><span>Subtotal</span><span className="font-mono">{formatCurrency(subtotal)}</span></div>
+                  <div className="flex items-center justify-between text-xs text-dark-400"><span>IVA ({taxP}%)</span><span className="font-mono">{formatCurrency(ival)}</span></div>
+                  {discP > 0 && <div className="flex items-center justify-between text-xs text-neon-green"><span>Descuento ({discP}%)</span><span className="font-mono">-{formatCurrency(disc)}</span></div>}
+                  <div className="divider-gradient my-2" />
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-bold text-dark-300 uppercase tracking-wider">Total</span>
+                    <span className="font-mono font-black text-xl text-neon-green neon-text">{formatCurrency(total || (subtotal + ival - disc))}</span>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-4 gap-1.5">
+                  <ActionBtn Ic={FaEye} label="Ver" />
+                  <ActionBtn Ic={FaFilePdf} label="PDF" />
+                  <ActionBtn Ic={FaQrcode} label="QR" />
+                  <ActionBtn Ic={FaPrint} label="Imprimir" />
+                </div>
+                <div className="mt-3 grid grid-cols-2 gap-2">
+                  {(q.status || '') !== 'aprobada' && (q.status || '') !== 'rechazada' && <button disabled={processingId === q.id} onClick={() => handleApprove(q)} className="btn-success !py-1.5 !text-xs flex items-center justify-center gap-1"><FaCheck size={11} /> Aprobar</button>}
+                  {(q.status || '') !== 'aprobada' && (q.status || '') !== 'rechazada' && <button disabled={processingId === q.id} onClick={() => handleReject(q)} className="btn-danger !py-1.5 !text-xs flex items-center justify-center gap-1"><FaTimes size={11} /> Rechazar</button>}
+                  {(q.status === 'aprobada' || q.status === 'rechazada') && <div className="col-span-2 text-center text-[11px] py-1.5 text-dark-500 italic">Estado final: {(q.status || '').charAt(0).toUpperCase() + (q.status || '').slice(1)}</div>}
                 </div>
               </div>
-
-              <div className="grid grid-cols-4 gap-1.5">
-                <ActionBtn Ic={FaEye} label="Ver" />
-                <ActionBtn Ic={FaFilePdf} label="PDF" />
-                <ActionBtn Ic={FaQrcode} label="QR" />
-                <ActionBtn Ic={FaPrint} label="Imprimir" />
-              </div>
-              <div className="mt-3 grid grid-cols-2 gap-2">
-                {q.status !== 'aprobada' && <button className="btn-success !py-1.5 !text-xs flex items-center justify-center gap-1"><FaCheck size={11} /> Aprobar</button>}
-                {q.status !== 'rechazada' && <button className="btn-danger !py-1.5 !text-xs flex items-center justify-center gap-1"><FaTimes size={11} /> Rechazar</button>}
-              </div>
-            </div>
-          </motion.div>
-        ))}
+            </motion.div>
+          );
+        })}
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-sm" onClick={() => setShowModal(false)} />
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-2xl w-[95vw] mx-auto p-6 shadow-glass relative z-10 max-h-[90vh] overflow-y-auto">
+            <h3 className="text-xl font-bold heading-glow mb-1">Nueva Cotización</h3>
+            <p className="text-xs text-dark-400 mb-5">Genera una nueva cotización para tu cliente</p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Cliente *</label>
+                <select required value={form.client_id} onChange={e => setForm({ ...form, client_id: e.target.value })} className="input-field">
+                  <option value="">Selecciona un cliente</option>
+                  {clients.map(c => <option key={c.id} value={c.id}>{c.company_name || c.contact_person || `Cliente #${c.id}`}</option>)}
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Asunto / Título *</label>
+                <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="input-field" placeholder="Ej: Proyecto robot industrial" />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Válida Hasta *</label>
+                  <input type="date" required value={form.valid_until} onChange={e => setForm({ ...form, valid_until: e.target.value })} className="input-field" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Estado</label>
+                  <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="input-field">
+                    {statusOptions.map(s => <option key={s} value={s}>{s.charAt(0).toUpperCase() + s.slice(1)}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Subtotal *</label>
+                  <input type="number" min="0" step="0.01" required value={form.subtotal} onChange={e => setForm({ ...form, subtotal: e.target.value })} className="input-field" placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">IVA (%)</label>
+                  <input type="number" min="0" max="100" step="0.01" value={form.tax} onChange={e => setForm({ ...form, tax: e.target.value })} className="input-field" placeholder="19" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Desc. (%)</label>
+                  <input type="number" min="0" max="100" step="0.01" value={form.discount} onChange={e => setForm({ ...form, discount: e.target.value })} className="input-field" placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Total *</label>
+                  <input type="number" min="0" step="0.01" required value={form.total_amount} onChange={e => setForm({ ...form, total_amount: e.target.value })} className="input-field" placeholder="0" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Notas</label>
+                <textarea value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="input-field min-h-[80px]" placeholder="Condiciones, términos, observaciones..." />
+              </div>
+              <div className="flex gap-2 pt-3 border-t border-dark-600/40 justify-end">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">Cancelar</button>
+                <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Guardando...' : 'Crear Cotización'}</button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
@@ -130,6 +312,6 @@ function ActionBtn({ Ic, label }) {
 }
 
 function MiniStat({ label, value, color }) {
-  const c = { primary: 'from-primary-500/20 border-primary-500/30 text-primary-300', green: 'from-neon-green/20 border-neon-green/30 text-neon-green', cyan: 'from-neon-blue/20 border-neon-blue/30 text-neon-blue', warning: 'from-neon-yellow/20 border-neon-yellow/30 text-neon-yellow' }[color];
+  const c = { primary: 'from-primary-500/20 border-primary-500/30 text-primary-300', green: 'from-neon-green/20 border-neon-green/30 text-neon-green', cyan: 'from-neon-blue/20 border-neon-blue/30 text-neon-blue', warning: 'from-neon-yellow/20 border-neon-yellow/30 text-neon-yellow' }[color] || 'from-primary-500/20 border-primary-500/30 text-primary-300';
   return <div className={`rounded-2xl p-4 border bg-gradient-to-br ${c}`}><div className="text-xs text-dark-300 font-semibold mb-1">{label}</div><div className="text-xl font-black truncate">{value}</div></div>;
 }

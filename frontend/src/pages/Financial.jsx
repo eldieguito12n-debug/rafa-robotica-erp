@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   FaCalculator, FaPlus, FaFileInvoiceDollar, FaArrowUp, FaArrowDown,
@@ -7,44 +7,71 @@ import {
 import { financialAPI } from '../lib/api';
 import { cn, formatCurrency, formatDate, getStatusBadge } from '../lib/utils';
 import { LineChart, DoughnutChart, BarChart } from '../components/ui/Charts.jsx';
+import { useAppData } from '../context/AppDataContext';
 
-const types = ['','ingreso','egreso','compra','venta'];
+const types = ['ingreso','egreso','compra','venta'];
+
+const emptyForm = {
+  type: 'ingreso',
+  category: '',
+  amount: '',
+  date: new Date().toISOString().slice(0,10),
+  description: '',
+  reference: '',
+};
 
 export default function Financial() {
+  const { addToast } = useAppData();
   const [records, setRecords] = useState([]);
   const [summary, setSummary] = useState(null);
   const [type, setType] = useState('');
   const [loading, setLoading] = useState(true);
+  const [showModal, setShowModal] = useState(false);
+  const [form, setForm] = useState(emptyForm);
+  const [saving, setSaving] = useState(false);
 
-  useEffect(() => {
-    (async () => {
-      try {
-        const [r, s] = await Promise.all([
-          financialAPI.records({ type: type || undefined, limit: 50 }).catch(() => ({ data: [] })),
-          financialAPI.summary().catch(() => ({ data: { total_ingresos: 0, total_egresos: 0, utilidad: 0, caja_diaria: 0 } })),
-        ]);
-        setRecords(r.data);
-        setSummary(s.data);
-      } catch {} finally { setLoading(false); }
-    })();
-  }, [type]);
+  const load = useCallback(async () => {
+    setLoading(true);
+    try {
+      const [r, s] = await Promise.all([
+        financialAPI.records({ type: type || undefined, limit: 50 }).catch(() => ({ data: [] })),
+        financialAPI.summary().catch(() => ({ data: { total_ingresos: 0, total_egresos: 0, utilidad: 0, caja_diaria: 0 } })),
+      ]);
+      setRecords(Array.isArray(r.data) ? r.data : []);
+      setSummary(s.data);
+    } catch (e) {
+      addToast('Error cargando datos financieros', 'error');
+    } finally { setLoading(false); }
+  }, [type, addToast]);
 
-  const mock = [
-    { id: 1, type: 'venta', description: 'Factura #001 - Brazo Robótico 6DOF', amount: 45000000, date: '2024-12-10', category: 'Ventas Proyectos', payment_method: 'Transferencia' },
-    { id: 2, type: 'ingreso', description: 'Abono #003 - Robot Entrega (50%)', amount: 12500000, date: '2025-07-02', category: 'Abonos', payment_method: 'PSE' },
-    { id: 3, type: 'compra', description: 'Compra componentes Lote #12', amount: 5500000, date: '2025-07-05', category: 'Insumos', payment_method: 'Crédito 30d' },
-    { id: 4, type: 'egreso', description: 'Nómina mes Julio', amount: 28000000, date: '2025-07-15', category: 'Nómina', payment_method: 'Transferencia' },
-    { id: 5, type: 'egreso', description: 'Mantenimiento equipos A/C', amount: 3500000, date: '2025-07-10', category: 'Mantenimiento', payment_method: 'Efectivo' },
-    { id: 6, type: 'venta', description: 'Cotización #007 - TechCorp', amount: 8500000, date: '2025-07-18', category: 'Cotizaciones', payment_method: 'Transferencia' },
-    { id: 7, type: 'ingreso', description: 'Pago parcial Factura #004', amount: 3000000, date: '2025-07-22', category: 'Cobros', payment_method: 'Cheque' },
-    { id: 8, type: 'egreso', description: 'Servicios públicos mes', amount: 2100000, date: '2025-07-25', category: 'Servicios', payment_method: 'PSE' },
-    { id: 9, type: 'compra', description: 'Materiales impresión 3D', amount: 2800000, date: '2025-07-28', category: 'Insumos 3D', payment_method: 'TC' },
-    { id: 10, type: 'venta', description: 'Curso capacitación robótica', amount: 4500000, date: '2025-07-29', category: 'Capacitaciones', payment_method: 'Transferencia' },
-  ];
-  const list = records.length ? records : mock;
+  useEffect(() => { load(); }, [type]);
+
+  const openNew = () => {
+    setForm({ ...emptyForm, date: new Date().toISOString().slice(0,10) });
+    setShowModal(true);
+  };
+
+  const handleSubmit = async (e) => {
+    e.preventDefault();
+    setSaving(true);
+    const payload = { ...form };
+    if (payload.amount) payload.amount = Number(payload.amount);
+    try {
+      await financialAPI.createRecord(payload);
+      addToast('Movimiento registrado', 'success');
+      setShowModal(false);
+      load();
+    } catch (err) {
+      addToast(err?.response?.data?.detail || 'Error guardando movimiento', 'error');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const list = records || [];
   const s = summary || {
-    total_ingresos: list.filter(r => ['ingreso','venta'].includes(r.type)).reduce((a,b)=>a+b.amount,0),
-    total_egresos: list.filter(r => ['egreso','compra'].includes(r.type)).reduce((a,b)=>a+b.amount,0),
+    total_ingresos: list.filter(r => ['ingreso','venta'].includes(r.type)).reduce((a,b)=>a+(b.amount||0),0),
+    total_egresos: list.filter(r => ['egreso','compra'].includes(r.type)).reduce((a,b)=>a+(b.amount||0),0),
   };
   s.utilidad = s.total_ingresos - s.total_egresos;
 
@@ -67,12 +94,12 @@ export default function Financial() {
           </div>
           <select value={type} onChange={e => setType(e.target.value)} className="input-field !py-2 text-sm w-36">
             <option value="">Todos</option>
-            {types.filter(Boolean).map(t => <option key={t} value={t}>{t}</option>)}
+            {types.map(t => <option key={t} value={t}>{t}</option>)}
           </select>
           <button className="btn-secondary !px-3 !py-2 !text-sm"><FaFilter size={12} /></button>
           <button className="btn-secondary !px-3 !py-2 !text-sm"><FaFileAlt size={12} /> Excel</button>
           <button className="btn-secondary !px-3 !py-2 !text-sm"><FaDownload size={12} /> PDF</button>
-          <button className="btn-primary !px-3 !py-2 !text-sm"><FaPlus size={12} /> Nuevo</button>
+          <button className="btn-primary !px-3 !py-2 !text-sm" onClick={openNew}><FaPlus size={12} /> Nuevo</button>
         </div>
       </motion.div>
 
@@ -125,6 +152,8 @@ export default function Financial() {
                 </tr>
               </thead>
               <tbody>
+                {loading && <tr><td colSpan={5} className="py-10 text-center"><span className="w-6 h-6 inline-block border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" /></td></tr>}
+                {!loading && list.length === 0 && <tr><td colSpan={5} className="py-10 text-center text-dark-500">Sin movimientos</td></tr>}
                 {list.map(r => {
                   const ing = ['ingreso','venta'].includes(r.type);
                   return (
@@ -168,6 +197,52 @@ export default function Financial() {
           </div>
         </div>
       </div>
+
+      {showModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-sm" onClick={() => setShowModal(false)} />
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-lg w-[95vw] mx-auto p-6 shadow-glass relative z-10">
+            <h3 className="text-xl font-bold heading-glow mb-1">Nuevo Movimiento Financiero</h3>
+            <p className="text-xs text-dark-400 mb-5">Registra un ingreso, egreso, compra o venta</p>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Tipo *</label>
+                  <select required value={form.type} onChange={e => setForm({ ...form, type: e.target.value })} className="input-field">
+                    {types.map(t => <option key={t} value={t}>{t.charAt(0).toUpperCase() + t.slice(1)}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Fecha *</label>
+                  <input type="date" required value={form.date} onChange={e => setForm({ ...form, date: e.target.value })} className="input-field" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Monto *</label>
+                  <input type="number" required min="0" step="0.01" value={form.amount} onChange={e => setForm({ ...form, amount: e.target.value })} className="input-field" placeholder="0.00" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Categoría</label>
+                  <input value={form.category} onChange={e => setForm({ ...form, category: e.target.value })} className="input-field" placeholder="Ej: Nómina, Insumos..." />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Descripción *</label>
+                <input required value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="input-field" placeholder="Detalle del movimiento" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Referencia (Factura, Recibo...)</label>
+                <input value={form.reference} onChange={e => setForm({ ...form, reference: e.target.value })} className="input-field" placeholder="N° de documento" />
+              </div>
+              <div className="flex gap-2 pt-3 border-t border-dark-600/40 justify-end">
+                <button type="button" onClick={() => setShowModal(false)} className="btn-secondary">Cancelar</button>
+                <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Guardando...' : 'Registrar Movimiento'}</button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
@@ -178,7 +253,7 @@ function FinCard({ label, value, icon: Ic, color, sub, positive }) {
     red: 'from-red-500/20 border-red-500/30 text-red-400',
     cyan: 'from-neon-blue/20 border-neon-blue/30 text-neon-blue',
     purple: 'from-neon-purple/20 border-neon-purple/30 text-neon-purple',
-  }[color] || map.cyan;
+  }[color] || 'from-neon-blue/20 border-neon-blue/30 text-neon-blue';
   return (
     <motion.div initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }} className={`card hud-corner !p-5 bg-gradient-to-br ${map}`}>
       <div className="flex items-start justify-between gap-3">

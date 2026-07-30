@@ -150,13 +150,15 @@ async def startup_event():
 
             db.flush()
 
+            from datetime import timedelta
+            today = date.today()
             tasks = [
-                ("Diseñar chasis del robot", p1.id, dev3.id, admin.id, "alta", "en_proceso", 70, date.today().replace(day=date.today().day + 3)),
-                ("Integrar sensor LIDAR", p1.id, dev2.id, jefe.id, "urgente", "pendiente", 0, date.today().replace(day=date.today().day + 5)),
-                ("Desarrollar algoritmo de navegación", p1.id, dev1.id, jefe.id, "alta", "en_proceso", 40, date.today().replace(day=date.today().day + 10)),
-                ("Diseñar PCB controladora", p1.id, dev2.id, jefe.id, "media", "pendiente", 0, date.today().replace(day=date.today().day + 7)),
+                ("Diseñar chasis del robot", p1.id, dev3.id, admin.id, "alta", "en_proceso", 70, today + timedelta(days=3)),
+                ("Integrar sensor LIDAR", p1.id, dev2.id, jefe.id, "urgente", "pendiente", 0, today + timedelta(days=5)),
+                ("Desarrollar algoritmo de navegación", p1.id, dev1.id, jefe.id, "alta", "en_proceso", 40, today + timedelta(days=10)),
+                ("Diseñar PCB controladora", p1.id, dev2.id, jefe.id, "media", "pendiente", 0, today + timedelta(days=7)),
                 ("Configurar sensores de humedad", p2.id, dev2.id, jefe.id, "media", "pendiente", 0, None),
-                ("Crear dashboard web", p2.id, dev1.id, jefe.id, "alta", "en_proceso", 50, date.today().replace(day=date.today().day + 6)),
+                ("Crear dashboard web", p2.id, dev1.id, jefe.id, "alta", "en_proceso", 50, today + timedelta(days=6)),
                 ("Calibración final de ejes", p3.id, tec.id, jefe.id, "baja", "finalizado", 100, None),
                 ("Documentación técnica", p3.id, dev3.id, jefe.id, "media", "finalizado", 100, None),
             ]
@@ -165,11 +167,11 @@ async def startup_event():
 
             fin_data = [
                 (FinancialType.VENTA, "Factura #001 - Proyecto Brazo Robótico", 45000000, date(2024, 12, 10), "Ventas Proyectos", "Transferencia Bancaria"),
-                (FinancialType.INGRESO, "Abono Cliente - Robot Entrega", 12500000, date.today().replace(day=2), "Abonos Proyectos", "PSE"),
-                (FinancialType.COMPRA, "Compra de componentes electrónicos", 5500000, date.today().replace(day=5), "Insumos Electrónica", "Crédito"),
-                (FinancialType.EGRESO, "Nómina del mes", 28000000, date.today().replace(day=15), "Nómina", "Transferencia"),
-                (FinancialType.EGRESO, "Mantenimiento equipos laboratorio", 3500000, date.today().replace(day=10), "Mantenimiento", "Efectivo"),
-                (FinancialType.VENTA, "Cotización #007 - Cliente TechCorp", 8500000, date.today().replace(day=18), "Cotizaciones Aprobadas", "Transferencia"),
+                (FinancialType.INGRESO, "Abono Cliente - Robot Entrega", 12500000, today - timedelta(days=28), "Abonos Proyectos", "PSE"),
+                (FinancialType.COMPRA, "Compra de componentes electrónicos", 5500000, today - timedelta(days=25), "Insumos Electrónica", "Crédito"),
+                (FinancialType.EGRESO, "Nómina del mes", 28000000, today - timedelta(days=15), "Nómina", "Transferencia"),
+                (FinancialType.EGRESO, "Mantenimiento equipos laboratorio", 3500000, today - timedelta(days=20), "Mantenimiento", "Efectivo"),
+                (FinancialType.VENTA, "Cotización #007 - Cliente TechCorp", 8500000, today - timedelta(days=12), "Cotizaciones Aprobadas", "Transferencia"),
             ]
             for t, desc, amt, d, cat, pm in fin_data:
                 db.add(FinancialRecord(type=t, description=desc, amount=amt, date=d, category=cat, payment_method=pm))

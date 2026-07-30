@@ -49,7 +49,7 @@ export default function Login() {
       <div className="glass rounded-3xl p-7 md:p-8 shadow-glass hud-corner scan-line relative">
         <div className="mb-6">
           <h2 className="text-3xl font-black heading-glow">Iniciar Sesión</h2>
-          <p className="text-sm text-dark-400 mt-1">Accede a tu plataforma RoboLab ERP</p>
+          <p className="text-sm text-dark-400 mt-1">Accede a tu plataforma RAFA ROBOTICA</p>
         </div>
 
         <form onSubmit={submit} className="space-y-4">

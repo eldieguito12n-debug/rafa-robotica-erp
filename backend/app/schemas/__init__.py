@@ -83,6 +83,17 @@ class ClientCreate(ClientBase):
     user_id: int
 
 
+class ClientUpdate(BaseModel):
+    company_name: Optional[str] = None
+    nit: Optional[str] = None
+    address: Optional[str] = None
+    contact_name: Optional[str] = None
+    contact_phone: Optional[str] = None
+    credit_limit: Optional[float] = None
+    current_balance: Optional[float] = None
+    notes: Optional[str] = None
+
+
 class Client(ClientBase):
     id: int
     user_id: int
@@ -399,6 +410,19 @@ class CalendarEvent(CalendarEventBase):
         from_attributes = True
 
 
+class CalendarEventUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    event_type: Optional[str] = None
+    start_datetime: Optional[datetime] = None
+    end_datetime: Optional[datetime] = None
+    all_day: Optional[bool] = None
+    location: Optional[str] = None
+    reminder_minutes: Optional[int] = None
+    project_id: Optional[int] = None
+    attendees: Optional[List[int]] = None
+
+
 class LabBase(BaseModel):
     name: str
     code: Optional[str] = None
@@ -412,12 +436,36 @@ class LabCreate(LabBase):
     pass
 
 
+class LabUpdate(BaseModel):
+    name: Optional[str] = None
+    code: Optional[str] = None
+    location: Optional[str] = None
+    description: Optional[str] = None
+    status: Optional[models.LabStatus] = None
+    capacity: Optional[int] = None
+    equipment: Optional[List[Dict[str, Any]]] = None
+    image_url: Optional[str] = None
+
+
 class Lab(LabBase):
     id: int
     created_at: Optional[datetime] = None
 
     class Config:
         from_attributes = True
+
+
+class DeveloperUpdate(BaseModel):
+    position: Optional[str] = None
+    specialty: Optional[str] = None
+    availability: Optional[models.DeveloperAvailability] = None
+    status: Optional[models.DeveloperStatus] = None
+    bio: Optional[str] = None
+    skills: Optional[List[str]] = None
+    hours_worked: Optional[float] = None
+    performance_score: Optional[float] = None
+    compliance_percentage: Optional[float] = None
+    photo_url: Optional[str] = None
 
 
 class DashboardStats(BaseModel):

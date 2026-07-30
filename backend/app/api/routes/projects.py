@@ -3,10 +3,32 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
+from ...core.activity_middleware import log_activity
 from ...models import Project, Task, ProjectDeveloper, User
 from ...schemas import Project as ProjectSchema, ProjectCreate, ProjectUpdate, ProjectDeveloperCreate, Task as TaskSchema, TaskCreate, TaskUpdate
 
 router = APIRouter(tags=["Projects & Tasks"])
+
+
+def _recalc_project_progress(db: Session, project_id: int):
+    """Regla de negocio 1: Recalcula progress_percentage del proyecto según sus tareas."""
+    if not project_id:
+        return
+    tasks = db.query(Task).filter(Task.project_id == project_id).all()
+    project = db.query(Project).filter(Project.id == project_id).first()
+    if not project:
+        return
+    if not tasks:
+        project.progress_percentage = 0
+    else:
+        avg = sum(t.progress_percentage or 0 for t in tasks) / len(tasks)
+        project.progress_percentage = round(avg, 1)
+        # Si TODAS las tareas están finalizadas → proyecto finalizado
+        all_done = all((str(t.status) == "finalizado" or (hasattr(t.status, 'value') and t.status.value == "finalizado")) for t in tasks) and len(tasks) > 0
+        if all_done and str(project.status) in ("planeacion", "en_progreso", "en_pruebas", "pendiente"):
+            project.status = "finalizado"
+    db.add(project)
+    db.flush()
 
 
 # ===== PROJECTS =====
@@ -38,6 +60,8 @@ def create_project(
 ):
     p = Project(**data.model_dump())
     db.add(p)
+    db.flush()
+    log_activity(db, current_user.id, "crear", "project", p.id, data.model_dump())
     db.commit()
     db.refresh(p)
     return p
@@ -63,6 +87,8 @@ def update_project(
         raise HTTPException(404, "Project not found")
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(p, k, v)
+    db.flush()
+    log_activity(db, current_user.id, "actualizar", "project", p.id, data.model_dump(exclude_unset=True))
     db.commit()
     db.refresh(p)
     return p
@@ -77,6 +103,7 @@ def delete_project(
     p = db.query(Project).filter(Project.id == project_id).first()
     if not p:
         raise HTTPException(404, "Project not found")
+    log_activity(db, current_user.id, "eliminar", "project", p.id, {"name": p.name})
     db.delete(p)
     db.commit()
     return {"message": "Project deleted"}
@@ -98,6 +125,8 @@ def add_developer_to_project(
     pd = ProjectDeveloper(**data.model_dump())
     pd.project_id = project_id
     db.add(pd)
+    db.flush()
+    log_activity(db, current_user.id, "crear", "project_developer", pd.id, {"project_id": project_id, **data.model_dump()})
     db.commit()
     return {"message": "Developer added"}
 
@@ -159,6 +188,9 @@ def create_task(
     t = Task(**data.model_dump())
     t.created_by_id = current_user.id
     db.add(t)
+    db.flush()
+    log_activity(db, current_user.id, "crear", "task", t.id, data.model_dump())
+    _recalc_project_progress(db, t.project_id)
     db.commit()
     db.refresh(t)
     return t
@@ -182,8 +214,14 @@ def update_task(
     t = db.query(Task).filter(Task.id == task_id).first()
     if not t:
         raise HTTPException(404, "Task not found")
+    old_project_id = t.project_id
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(t, k, v)
+    db.flush()
+    log_activity(db, current_user.id, "actualizar", "task", t.id, data.model_dump(exclude_unset=True))
+    _recalc_project_progress(db, old_project_id)
+    if t.project_id != old_project_id:
+        _recalc_project_progress(db, t.project_id)
     db.commit()
     db.refresh(t)
     return t
@@ -202,6 +240,9 @@ def update_task_status(
     t.status = status
     if status == "finalizado":
         t.progress_percentage = 100
+    db.flush()
+    log_activity(db, current_user.id, "actualizar", "task", t.id, {"status": status})
+    _recalc_project_progress(db, t.project_id)
     db.commit()
     return {"message": "Status updated"}
 
@@ -215,6 +256,10 @@ def delete_task(
     t = db.query(Task).filter(Task.id == task_id).first()
     if not t:
         raise HTTPException(404, "Task not found")
+    project_id = t.project_id
+    log_activity(db, current_user.id, "eliminar", "task", t.id, {"title": t.title})
     db.delete(t)
+    db.flush()
+    _recalc_project_progress(db, project_id)
     db.commit()
     return {"message": "Task deleted"}

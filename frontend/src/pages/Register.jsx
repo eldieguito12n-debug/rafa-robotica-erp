@@ -41,7 +41,7 @@ export default function Register() {
     <motion.div initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} className="w-full max-w-lg mx-auto">
       <div className="glass rounded-3xl p-7 shadow-glass hud-corner relative overflow-hidden">
         <h2 className="text-3xl font-black heading-glow mb-1">Crear Cuenta</h2>
-        <p className="text-sm text-dark-400 mb-6">Únete a la plataforma RoboLab ERP</p>
+        <p className="text-sm text-dark-400 mb-6">Únete a la plataforma RAFA ROBOTICA</p>
 
         <form onSubmit={submit} className="space-y-3.5">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">

@@ -19,7 +19,6 @@ const labels = {
   '/inventory': { label: 'Inventario', desc: 'Control de componentes y suministros' },
   '/labs': { label: 'Laboratorios', desc: 'Estado de los espacios de trabajo' },
   '/financial': { label: 'Finanzas', desc: 'Ingresos, egresos y utilidad' },
-  '/clients': { label: 'Clientes', desc: 'Base de datos de clientes' },
   '/quotes': { label: 'Cotizaciones', desc: 'Cotizaciones y propuestas comerciales' },
   '/invoices': { label: 'Facturas', desc: 'Facturación y cobros' },
   '/calendar': { label: 'Calendario', desc: 'Cronograma de eventos y entregas' },
@@ -81,7 +80,7 @@ export default function Topbar() {
 
         <div className="hidden xl:flex items-center gap-2 px-3 py-2 rounded-xl bg-dark-700/50 border border-dark-600/50 text-xs text-dark-400 w-96">
           <FaSearch size={12} />
-          <span className="flex-1">Buscar proyectos, tareas, clientes...</span>
+          <span className="flex-1">Buscar proyectos, tareas...</span>
           <kbd className="px-1.5 py-0.5 rounded bg-dark-800 border border-dark-600/60 text-[10px] font-mono">⌘K</kbd>
         </div>
 

@@ -85,20 +85,97 @@ def get_chart_data(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user),
 ):
-    import random
-    labels_map = {
-        "week": ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"],
-        "month": ["Sem1", "Sem2", "Sem3", "Sem4"],
-        "year": ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"],
-    }
-    labels = labels_map.get(period, labels_map["month"])
-    data1 = [random.randint(100, 1000) for _ in labels]
-    data2 = [random.randint(50, 800) for _ in labels]
+    today = date.today()
+    from datetime import timedelta
+    from calendar import monthrange
+    from sqlalchemy import func, extract
+
+    if period == "week":
+        labels = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"]
+        start = today - timedelta(days=today.weekday())
+        ranges = [(start + timedelta(days=i), start + timedelta(days=i+1)) for i in range(7)]
+    elif period == "year":
+        labels = ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+        ranges = []
+        year = today.year
+        for m in range(1, 13):
+            s = date(year, m, 1)
+            _, ld = monthrange(year, m)
+            e = date(year, m, ld) + timedelta(days=1)
+            ranges.append((s, e))
+    else:  # month
+        labels = ["Sem1", "Sem2", "Sem3", "Sem4"]
+        first = today.replace(day=1)
+        _, ld = monthrange(first.year, first.month)
+        step = max(1, ld // 4)
+        ranges = []
+        d = first
+        for i in range(4):
+            start_d = d
+            end_d = (d + timedelta(days=step)) if i < 3 else (first + timedelta(days=ld))
+            ranges.append((start_d, end_d))
+            d = end_d
+
+    def frange(records, dates, filter_fld=None, filter_val=None, amount_fld=None):
+        out = []
+        for s, e in dates:
+            q = records
+            q = q.filter(filter_fld >= s, filter_fld < e)
+            if filter_val is not None:
+                # ya filtrado afuera
+                pass
+            if amount_fld is not None:
+                s1 = q.with_entities(func.sum(amount_fld)).scalar() or 0
+            else:
+                s1 = q.count()
+            out.append(round(float(s1), 2))
+        return out
+
+    color1, color2 = "#0066ff", "#00ff88"
+    if chart_type == "sales":
+        q = db.query(FinancialRecord).filter(FinancialRecord.type.in_(["ingreso", "venta"]))
+        data1 = frange(q, ranges, FinancialRecord.date, amount_fld=FinancialRecord.amount)
+        q2 = db.query(Invoice)
+        data2 = frange(q2, ranges, Invoice.created_at, amount_fld=Invoice.total)
+        label1, label2 = "Ventas ($)", "Facturas emitidas"
+        color1, color2 = "#00ff88", "#00aaff"
+    elif chart_type == "expenses":
+        q = db.query(FinancialRecord).filter(FinancialRecord.type.in_(["egreso", "compra"]))
+        data1 = frange(q, ranges, FinancialRecord.date, amount_fld=FinancialRecord.amount)
+        q2 = db.query(InventoryMovement).filter(InventoryMovement.type == "entrada")
+        data2 = frange(q2, ranges, InventoryMovement.date, amount_fld=InventoryMovement.total_value)
+        label1, label2 = "Gastos ($)", "Compras inventario"
+        color1, color2 = "#ff4d6d", "#ffa94d"
+    elif chart_type == "projects":
+        q = db.query(Project)
+        data1 = frange(q, ranges, Project.start_date)
+        q2 = db.query(Project).filter(Project.status == "finalizado")
+        data2 = frange(q2, ranges, Project.end_date if hasattr(Project, 'end_date') else Project.updated_at)
+        label1, label2 = "Iniciados", "Finalizados"
+        color1, color2 = "#7c5cff", "#00c2ff"
+    elif chart_type == "tasks":
+        q = db.query(Task)
+        data1 = frange(q, ranges, Task.created_at)
+        q2 = db.query(Task).filter(Task.status == "finalizado")
+        data2 = frange(q2, ranges, Task.updated_at)
+        label1, label2 = "Creadas", "Completadas"
+        color1, color2 = "#f59f00", "#82c91e"
+    elif chart_type == "inventory":
+        q = db.query(InventoryMovement).filter(InventoryMovement.type == "entrada")
+        data1 = frange(q, ranges, InventoryMovement.date, amount_fld=InventoryMovement.quantity)
+        q2 = db.query(InventoryMovement).filter(InventoryMovement.type == "salida")
+        data2 = frange(q2, ranges, InventoryMovement.date, amount_fld=InventoryMovement.quantity)
+        label1, label2 = "Entradas (uds)", "Salidas (uds)"
+        color1, color2 = "#20c997", "#e64980"
+    else:
+        data1 = [0]*len(labels)
+        data2 = [0]*len(labels)
+        label1, label2 = "Dataset 1", "Dataset 2"
 
     return {
         "labels": labels,
         "datasets": [
-            {"label": chart_type.capitalize(), "data": data1, "color": "#0066ff"},
-            {"label": "Comparativo", "data": data2, "color": "#00ff88"},
+            {"label": label1, "data": data1, "color": color1},
+            {"label": label2, "data": data2, "color": color2},
         ]
     }

@@ -1,32 +1,91 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import {
   FaFileInvoiceDollar, FaSearch, FaPlus, FaFilePdf, FaDownload, FaPrint,
   FaCalendarAlt, FaUserFriends, FaDollarSign, FaCheckCircle, FaClock, FaEnvelope, FaCreditCard,
+  FaSyncAlt, FaTrash, FaCreditCard as FaPay, FaFileInvoice,
 } from 'react-icons/fa';
 import { cn, formatCurrency, formatDate, getStatusBadge } from '../lib/utils';
-
-const invoices = [
-  { id: 1, invoice_number: 'FAC-2025-0015', client: 'Industrias Andinas S.A.', date: '2025-07-01', due_date: '2025-07-31', subtotal: 8000000, tax: 1520000, discount: 0, total: 9520000, status: 'vencida', paid: 0 },
-  { id: 2, invoice_number: 'FAC-2025-0016', client: 'AgroTech del Caribe', date: '2025-07-05', due_date: '2025-08-05', subtotal: 13500000, tax: 2565000, discount: 500000, total: 15565000, status: 'parcial', paid: 5000000 },
-  { id: 3, invoice_number: 'FAC-2025-0017', client: 'TechCorp Solutions', date: '2025-07-10', due_date: '2025-08-10', subtotal: 25000000, tax: 4750000, discount: 0, total: 29750000, status: 'pendiente', paid: 0 },
-  { id: 4, invoice_number: 'FAC-2025-0018', client: 'HealthTech Solutions', date: '2025-07-15', due_date: '2025-08-15', subtotal: 18000000, tax: 3420000, discount: 0, total: 21420000, status: 'pagada', paid: 21420000 },
-  { id: 5, invoice_number: 'FAC-2025-0019', client: 'Constructora Proyectos XXI', date: '2025-07-20', due_date: '2025-08-20', subtotal: 48000000, tax: 9120000, discount: 2000000, total: 55120000, status: 'pagada', paid: 55120000 },
-  { id: 6, invoice_number: 'FAC-2025-0020', client: 'LogiMove Freight', date: '2025-07-25', due_date: '2025-08-25', subtotal: 32000000, tax: 6080000, discount: 0, total: 38080000, status: 'pendiente', paid: 0 },
-];
+import { financialAPI, clientsAPI } from '../lib/api';
+import { useAppData } from '../context/AppDataContext';
 
 export default function Invoices() {
+  const { addToast } = useAppData();
   const [search, setSearch] = useState('');
   const [status, setStatus] = useState('');
-  const list = invoices.filter(i =>
-    (!search || (i.client || '').toLowerCase().includes(search.toLowerCase()) || i.invoice_number.includes(search)) &&
-    (!status || i.status === status)
-  );
-  const s = {
-    pendiente: list.filter(i => i.status === 'pendiente').reduce((a,b)=>a+b.total,0),
+  const [invoices, setInvoices] = useState([]);
+  const [clients, setClients] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = async () => {
+    setLoading(true);
+    try {
+      const [ir, cr] = await Promise.allSettled([
+        financialAPI.invoices(status ? { status } : {}),
+        clientsAPI.list({ limit: 300 }),
+      ]);
+      const invs = ir.status === 'fulfilled' && Array.isArray(ir.value.data) ? ir.value.data : [];
+      const cls = cr.status === 'fulfilled' && Array.isArray(cr.value.data) ? cr.value.data : [];
+      setInvoices(invs);
+      setClients(cls);
+    } catch {
+      addToast('Error cargando facturas', 'error');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => { load(); }, [status]);
+
+  const byClient = (id) => clients.find(c => c.id === id);
+
+  const list = invoices
+    .map(i => {
+      const c = byClient(i.client_id);
+      const totalPaid = Array.isArray(i.payments) ? i.payments.reduce((a,b)=>a + (b.amount || 0), 0) : (i.amount_paid || 0);
+      const st = String(i.status || 'pendiente').toLowerCase();
+      // Si el backend no marca vencidas, lo hacemos aquí
+      const realStatus = (st === 'pendiente' || st === 'parcial') && i.due_date && new Date(i.due_date) < new Date() ? 'vencida' : st;
+      return {
+        ...i,
+        client_name: c ? (c.company_name || c.contact_person || `Cliente #${i.client_id}`) : (`Cliente #${i.client_id}`),
+        paid: totalPaid,
+        total: Number(i.total || i.total_amount || 0),
+        status: realStatus,
+      };
+    })
+    .filter(i =>
+      (!search || (i.client_name || '').toLowerCase().includes(search.toLowerCase()) || (i.invoice_number || `FAC-${i.id}`).toLowerCase().includes(search.toLowerCase())) &&
+      (!status || i.status === status)
+    );
+
+  const totals = {
+    pendiente: list.filter(i => ['pendiente','parcial','vencida'].includes(i.status)).reduce((a,b)=>a + b.total - b.paid,0),
     pagada: list.filter(i => i.status === 'pagada').reduce((a,b)=>a+b.total,0),
-    vencida: list.filter(i => i.status === 'vencida').reduce((a,b)=>a+b.total,0),
-    parcial: list.filter(i => i.status === 'parcial').reduce((a,b)=>a+b.total,0),
+    vencida: list.filter(i => i.status === 'vencida').reduce((a,b)=>a + (b.total - b.paid),0),
+    parcial: list.filter(i => i.status === 'parcial').reduce((a,b)=>a + (b.total - b.paid),0),
+  };
+
+  const handleDelete = async (inv) => {
+    if (!confirm(`¿Eliminar factura ${inv.invoice_number || '#'+inv.id}?`)) return;
+    try {
+      await financialAPI.removeInvoice(inv.id);
+      addToast('Factura eliminada', 'success');
+      setInvoices(prev => prev.filter(x => x.id !== inv.id));
+    } catch {
+      addToast('Error eliminando factura', 'error');
+    }
+  };
+
+  const handleMarkPaid = async (inv) => {
+    if (!confirm(`¿Marcar factura ${inv.invoice_number || '#'+inv.id} como pagada?`)) return;
+    try {
+      await financialAPI.updateInvoice(inv.id, { status: 'pagada' });
+      addToast('Factura actualizada', 'success');
+      load();
+    } catch {
+      addToast('Error actualizando factura', 'error');
+    }
   };
 
   return (
@@ -38,21 +97,26 @@ export default function Invoices() {
           </div>
           <div>
             <h2 className="text-xl font-bold heading-glow">Facturación</h2>
-            <p className="text-xs text-dark-400">Facturas, recibos, órdenes de compra y trabajo</p>
+            <p className="text-xs text-dark-400">{list.length} facturas · Emitir, seguir cobros, descargar PDF</p>
           </div>
         </div>
         <div className="md:ml-auto flex flex-wrap items-center gap-2">
           <div className="relative"><FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-500" size={13}/><input value={search} onChange={e=>setSearch(e.target.value)} placeholder="Buscar..." className="input-field !py-2 !pl-8 text-sm w-52"/></div>
-          <select value={status} onChange={e=>setStatus(e.target.value)} className="input-field !py-2 text-sm w-36"><option value="">Todos</option><option value="pendiente">Pendiente</option><option value="pagada">Pagada</option><option value="parcial">Parcial</option><option value="vencida">Vencida</option><option value="anulada">Anulada</option></select>
+          <select value={status} onChange={e=>setStatus(e.target.value)} className="input-field !py-2 text-sm w-36">
+            <option value="">Todos</option><option value="pendiente">Pendiente</option>
+            <option value="pagada">Pagada</option><option value="parcial">Parcial</option>
+            <option value="vencida">Vencida</option><option value="anulada">Anulada</option>
+          </select>
+          <button onClick={load} className="btn-secondary !px-3 !py-2 !text-sm" title="Refrescar"><FaSyncAlt size={12}/></button>
           <button className="btn-secondary !px-3 !py-2 !text-sm"><FaDownload size={12}/> Exportar</button>
           <button className="btn-primary !px-3 !py-2 !text-sm"><FaPlus size={12}/> Factura</button>
         </div>
       </motion.div>
 
       <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-        <StatusCard label="Por Cobrar" value={s.pendiente + s.parcial + s.vencida} color="warning" Icon={FaClock} />
-        <StatusCard label="Pagado (mes)" value={s.pagada} color="success" Icon={FaCheckCircle} />
-        <StatusCard label="Vencido" value={s.vencida} color="danger" Icon={FaEnvelope} />
+        <StatusCard label="Por Cobrar" value={totals.pendiente} color="warning" Icon={FaClock} />
+        <StatusCard label="Pagado" value={totals.pagada} color="success" Icon={FaCheckCircle} />
+        <StatusCard label="Vencido" value={totals.vencida} color="danger" Icon={FaEnvelope} />
         <StatusCard label="Total Facturado" value={list.reduce((a,b)=>a+b.total,0)} color="primary" Icon={FaCreditCard} />
       </div>
 
@@ -72,25 +136,33 @@ export default function Invoices() {
               </tr>
             </thead>
             <tbody>
+              {loading && Array.from({length:4}).map((_,i)=>(
+                <tr key={i} className="border-b border-dark-700/40 animate-pulse"><td colSpan="8" className="py-6 px-4">&nbsp;</td></tr>
+              ))}
+              {!loading && list.length === 0 && (
+                <tr><td colSpan="8" className="py-12 text-center text-dark-500 text-sm">
+                  <FaFileInvoiceDollar size={32} className="mx-auto mb-2 opacity-40"/>Sin facturas que mostrar
+                </td></tr>
+              )}
               {list.map((inv, i) => {
                 const pending = inv.total - inv.paid;
-                const pctPaid = Math.round((inv.paid / inv.total) * 100);
+                const pctPaid = inv.total > 0 ? Math.round((inv.paid / inv.total) * 100) : 0;
                 return (
                   <motion.tr key={inv.id} initial={{ opacity: 0 }} whileInView={{ opacity: 1 }} viewport={{ once: true }} transition={{ delay: i*0.03 }} className="border-b border-dark-700/40 hover:bg-primary-500/5 transition">
                     <td className="py-3 px-4">
-                      <div className="font-mono font-bold text-primary-300">{inv.invoice_number}</div>
-                      <div className="text-[10px] text-dark-500 md:hidden">{formatDate(inv.date)}</div>
+                      <div className="font-mono font-bold text-primary-300">{inv.invoice_number || `FAC-${inv.id.toString().padStart(4,'0')}`}</div>
+                      <div className="text-[10px] text-dark-500 md:hidden">{formatDate(inv.issue_date || inv.created_at || inv.date)}</div>
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-primary-500/15 border border-primary-500/30 flex items-center justify-center text-primary-300 flex-shrink-0"><FaUserFriends size={11} /></div>
                         <div className="min-w-0">
-                          <div className="font-semibold truncate max-w-[220px]">{inv.client}</div>
+                          <div className="font-semibold truncate max-w-[220px]">{inv.client_name}</div>
                           <div className="text-[11px] text-dark-500 flex items-center gap-1.5 sm:hidden"><span className={getStatusBadge(inv.status)}>{inv.status}</span></div>
                         </div>
                       </div>
                     </td>
-                    <td className="py-3 px-4 hidden md:table-cell"><div className="flex items-center gap-1.5 text-xs text-dark-300"><FaCalendarAlt size={10}/>{formatDate(inv.date)}</div></td>
+                    <td className="py-3 px-4 hidden md:table-cell"><div className="flex items-center gap-1.5 text-xs text-dark-300"><FaCalendarAlt size={10}/>{formatDate(inv.issue_date || inv.created_at || inv.date)}</div></td>
                     <td className={`py-3 px-4 hidden lg:table-cell text-xs ${inv.status === 'vencida' ? 'text-red-400 font-bold' : 'text-dark-300'}`}><FaCalendarAlt size={10} className="inline mr-1"/>{formatDate(inv.due_date)}</td>
                     <td className="py-3 px-4 text-right">
                       <div className="font-mono font-bold text-white">{formatCurrency(inv.total)}</div>
@@ -105,9 +177,11 @@ export default function Invoices() {
                     <td className="py-3 px-4"><span className={`${getStatusBadge(inv.status)} capitalize`}>{inv.status}</span></td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-end gap-1">
-                        <button className="w-8 h-8 rounded-lg hover:bg-dark-700/60 text-dark-400 hover:text-primary-300 flex items-center justify-center" title="Ver"><FaFileInvoiceDollar size={11}/></button>
+                        <button onClick={() => handleMarkPaid(inv)} disabled={inv.status === 'pagada'} className="w-8 h-8 rounded-lg hover:bg-neon-green/10 text-dark-400 hover:text-neon-green disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center" title="Marcar pagada"><FaCheckCircle size={11}/></button>
+                        <button className="w-8 h-8 rounded-lg hover:bg-dark-700/60 text-dark-400 hover:text-primary-300 flex items-center justify-center" title="Ver"><FaFileInvoice size={11}/></button>
                         <button className="w-8 h-8 rounded-lg hover:bg-neon-red-500/15 text-dark-400 hover:text-red-400 flex items-center justify-center" title="PDF"><FaFilePdf size={11}/></button>
                         <button className="w-8 h-8 rounded-lg hover:bg-dark-700/60 text-dark-400 hover:text-white flex items-center justify-center" title="Imprimir"><FaPrint size={11}/></button>
+                        <button onClick={() => handleDelete(inv)} className="w-8 h-8 rounded-lg hover:bg-red-500/10 text-dark-400 hover:text-red-400 flex items-center justify-center" title="Eliminar"><FaTrash size={11}/></button>
                       </div>
                     </td>
                   </motion.tr>

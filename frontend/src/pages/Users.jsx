@@ -44,7 +44,7 @@ export default function Users() {
   const [modalOpen, setModalOpen] = useState(false);
   const [submitting, setSubmitting] = useState(false);
   const [form, setForm] = useState({
-    full_name: '', email: '', phone: '', role: 'programador', password: genPass(),
+    full_name: '', email: '', phone: '', role: 'programador', custom_role: '', password: genPass(),
   });
 
   const load = async () => {
@@ -66,16 +66,24 @@ export default function Users() {
   };
 
   const openModal = () => {
-    setForm({ full_name: '', email: '', phone: '', role: 'programador', password: genPass() });
+    setForm({ full_name: '', email: '', phone: '', role: 'programador', custom_role: '', password: genPass() });
     setModalOpen(true);
   };
 
   const submitCreate = async (e) => {
     e.preventDefault();
     if (!form.full_name || !form.email || !form.password) return addToast('Completa Nombre, Email y Contraseña', 'warning');
+    if (form.role === 'otro' && !form.custom_role) return addToast('Especifique el rol personalizado', 'warning');
     setSubmitting(true);
+    const payload = {
+      full_name: form.full_name,
+      email: form.email,
+      phone: form.phone,
+      password: form.password,
+      role: form.role === 'otro' ? form.custom_role : form.role,
+    };
     try {
-      await authAPI.register(form);
+      await authAPI.register(payload);
       addToast('✅ Trabajador creado correctamente', 'success');
       setModalOpen(false);
       load();
@@ -218,7 +226,7 @@ export default function Users() {
               </button>
               <div className="pt-10 mb-5 text-center">
                 <h3 className="text-2xl font-black heading-glow">Nuevo Trabajador</h3>
-                <p className="text-xs text-dark-400 mt-1">Registra un nuevo miembro del equipo RoboLab</p>
+                <p className="text-xs text-dark-400 mt-1">Registra un nuevo miembro del equipo RAFA ROBOTICA</p>
               </div>
 
               <form onSubmit={submitCreate} className="space-y-3.5">
@@ -256,7 +264,14 @@ export default function Users() {
                     </label>
                     <select value={form.role} onChange={e => setForm({ ...form, role: e.target.value })} className="input-field !py-2.5">
                       {rolesList.map(r => <option key={r} value={r}>{rolesSpanish[r]}</option>)}
+                      <option value="otro">Otro (Especifique)</option>
                     </select>
+                    {form.role === 'otro' && (
+                      <input
+                        type="text" value={form.custom_role} onChange={e => setForm({ ...form, custom_role: e.target.value })}
+                        placeholder="Escriba el rol..." className="input-field !py-2.5 mt-2" autoFocus
+                      />
+                    )}
                   </div>
                   <div className="space-y-1.5">
                     <label className="text-[11px] font-semibold uppercase tracking-wider text-dark-400 flex items-center justify-between">

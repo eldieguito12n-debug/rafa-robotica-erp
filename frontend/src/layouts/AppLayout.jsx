@@ -24,7 +24,7 @@ export default function AppLayout() {
           </motion.div>
         </main>
         <footer className="px-6 py-4 text-xs text-dark-500 border-t border-dark-700/50 flex flex-wrap justify-between gap-2 relative z-10">
-          <div>© 2025 RoboLab ERP · Todos los derechos reservados</div>
+          <div>© 2025 RAFA ROBOTICA · Todos los derechos reservados</div>
           <div className="flex items-center gap-4">
             <span className="flex items-center gap-1.5">
               <span className="w-2 h-2 rounded-full bg-neon-green animate-pulse" />

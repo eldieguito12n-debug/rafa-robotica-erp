@@ -1,10 +1,14 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, WebSocket, WebSocketDisconnect
 from sqlalchemy.orm import Session
-from typing import Optional, List, Dict
+from typing import Optional, List, Dict, Any
 from datetime import datetime, timedelta
 import json
+import os
+import random
+from jose import JWTError, jwt
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
+from ...core.config import settings
 from ...models import Message, Notification, CalendarEvent, Lab, ActivityLog, User
 from ...schemas import Message as MessageSchema, MessageCreate, Notification as NotifSchema, CalendarEvent as EventSchema, CalendarEventCreate, Lab as LabSchema, LabCreate
 
@@ -192,14 +196,70 @@ def delete_calendar_event(event_id: int, db: Session = Depends(get_db), current_
 
 
 # ===== AI ASSISTANT =====
-@router.post("/ai/chat")
-def ai_chat(
-    prompt: str,
-    context: Optional[Dict] = None,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
-):
-    import random
+SYSTEM_PROMPT = "Eres asistente de RoboLabERP, ERP para laboratorios de robótica en Colombia."
+
+
+def _build_user_prompt(prompt: str, context: Optional[Dict]) -> str:
+    if not context:
+        return prompt
+    ctx_str = json.dumps(context, ensure_ascii=False, default=str)
+    return f"Contexto adicional proporcionado por el usuario:\n{ctx_str}\n\nPregunta del usuario:\n{prompt}"
+
+
+async def _call_openai(prompt: str) -> str:
+    from openai import AsyncOpenAI
+    client = AsyncOpenAI(api_key=os.environ["OPENAI_API_KEY"])
+    resp = await client.chat.completions.create(
+        model="gpt-4o-mini",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.3,
+    )
+    return resp.choices[0].message.content or ""
+
+
+async def _call_anthropic(prompt: str) -> str:
+    from anthropic import AsyncAnthropic
+    client = AsyncAnthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
+    resp = await client.messages.create(
+        model="claude-3-haiku-20240307",
+        max_tokens=1024,
+        system=SYSTEM_PROMPT,
+        messages=[{"role": "user", "content": prompt}],
+        temperature=0.3,
+    )
+    blocks = resp.content or []
+    return "".join(getattr(b, "text", "") for b in blocks)
+
+
+async def _call_gemini(prompt: str) -> str:
+    import google.generativeai as genai
+    genai.configure(api_key=os.environ["GOOGLE_API_KEY"])
+    model = genai.GenerativeModel("gemini-1.5-flash", system_instruction=SYSTEM_PROMPT)
+    resp = model.generate_content(prompt)
+    return getattr(resp, "text", "") or ""
+
+
+async def _call_openrouter(prompt: str) -> str:
+    from openai import AsyncOpenAI
+    client = AsyncOpenAI(
+        api_key=os.environ["OPEN_ROUTER_API_KEY"],
+        base_url="https://openrouter.ai/api/v1",
+    )
+    resp = await client.chat.completions.create(
+        model="openrouter/auto",
+        messages=[
+            {"role": "system", "content": SYSTEM_PROMPT},
+            {"role": "user", "content": prompt},
+        ],
+        temperature=0.3,
+    )
+    return resp.choices[0].message.content or ""
+
+
+def _fallback_response() -> tuple[str, bool]:
     responses = [
         f"He analizado tu consulta. Basado en los datos actuales, te recomiendo priorizar las tareas con fecha límite próxima.",
         f"Interesante pregunta. Revisando los proyectos activos, te sugiero hacer seguimiento a los que tienen menos de 50% de avance.",
@@ -208,8 +268,39 @@ def ai_chat(
         f"El análisis financiero indica una utilidad proyectada positiva. Revisa los gastos en categoría 'insumos' para optimizar.",
         f"Encontré {random.randint(2, 8)} artículos con inventario bajo. Te sugiero generar la orden de compra a la brevedad.",
     ]
+    warning = "\n\n⚠️ Aviso: No se detectó ninguna API key de LLM configurada. Esta respuesta es generada localmente de forma aleatoria. Configura OPENAI_API_KEY, ANTHROPIC_API_KEY, GOOGLE_API_KEY o OPEN_ROUTER_API_KEY en el archivo .env para habilitar el asistente real."
+    return random.choice(responses) + warning, True
+
+
+@router.post("/ai/chat")
+async def ai_chat(
+    prompt: str,
+    context: Optional[Dict] = None,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user),
+):
+    user_prompt = _build_user_prompt(prompt, context)
+    used_fallback = False
+    ai_response = ""
+
+    try:
+        if os.environ.get("OPENAI_API_KEY"):
+            ai_response = await _call_openai(user_prompt)
+        elif os.environ.get("ANTHROPIC_API_KEY"):
+            ai_response = await _call_anthropic(user_prompt)
+        elif os.environ.get("GOOGLE_API_KEY"):
+            ai_response = await _call_gemini(user_prompt)
+        elif os.environ.get("OPEN_ROUTER_API_KEY"):
+            ai_response = await _call_openrouter(user_prompt)
+        else:
+            ai_response, used_fallback = _fallback_response()
+    except Exception as e:
+        ai_response, used_fallback = _fallback_response()
+        ai_response += f"\n\n(Detalles del error: {type(e).__name__})"
+
     return {
-        "response": random.choice(responses),
+        "response": ai_response,
+        "fallback": used_fallback,
         "suggestions": [
             "Ver proyectos activos",
             "Generar reporte de productividad",
@@ -272,6 +363,29 @@ def get_activity_log(
 
 
 # ===== WEBSOCKET for real-time =====
+def _extract_ws_token(websocket: WebSocket) -> Optional[str]:
+    token = websocket.query_params.get("token")
+    if token:
+        return token
+    auth_header = websocket.headers.get("authorization") or websocket.headers.get("Authorization")
+    if auth_header:
+        parts = auth_header.split()
+        if len(parts) == 2 and parts[0].lower() == "bearer":
+            return parts[1]
+    return None
+
+
+def _decode_ws_user_id(token: str) -> Optional[int]:
+    try:
+        payload = jwt.decode(token, settings.SECRET_KEY, algorithms=[settings.ALGORITHM])
+        sub = payload.get("sub")
+        if sub is None:
+            return None
+        return int(sub)
+    except (JWTError, ValueError, TypeError):
+        return None
+
+
 class ConnectionManager:
     def __init__(self):
         self.active_connections: Dict[int, WebSocket] = {}
@@ -295,15 +409,31 @@ class ConnectionManager:
 manager = ConnectionManager()
 
 
-@router.websocket("/ws/{user_id}")
+@router.websocket("/ws/chat/{user_id}")
 async def websocket_endpoint(websocket: WebSocket, user_id: int, db: Session = Depends(get_db)):
-    await manager.connect(user_id, websocket)
+    token = _extract_ws_token(websocket)
+    if not token:
+        await websocket.close(code=4001, reason="Missing auth token")
+        return
+
+    real_user_id = _decode_ws_user_id(token)
+    if not real_user_id:
+        await websocket.close(code=4001, reason="Invalid or expired token")
+        return
+
+    user = db.query(User).filter(User.id == real_user_id).first()
+    if not user or not user.is_active:
+        await websocket.close(code=4001, reason="Invalid user")
+        return
+
+    actual_user_id = user.id
+    await manager.connect(actual_user_id, websocket)
     try:
         while True:
             data = await websocket.receive_json()
             if data.get("type") == "message":
                 msg_data = MessageCreate(
-                    sender_id=user_id,
+                    sender_id=actual_user_id,
                     receiver_id=data.get("receiver_id"),
                     content=data.get("content", ""),
                     message_type=data.get("message_type", "text"),
@@ -312,12 +442,18 @@ async def websocket_endpoint(websocket: WebSocket, user_id: int, db: Session = D
                 db.add(msg)
                 db.commit()
                 db.refresh(msg)
-                notif = Notification(user_id=data.get("receiver_id"), title="Nuevo mensaje", message=msg.content[:100], type="chat")
+                notif = Notification(user_id=data.get("receiver_id"), title="Nuevo mensaje", message=msg.content[:100], type="chat", related_type="message")
                 db.add(notif)
                 db.commit()
                 await manager.send_personal_message(
                     data.get("receiver_id"),
-                    {"type": "new_message", "data": {"id": msg.id, "sender_id": user_id, "content": msg.content, "created_at": msg.created_at.isoformat() if msg.created_at else None}}
+                    {"type": "new_message", "data": {"id": msg.id, "sender_id": actual_user_id, "content": msg.content, "created_at": msg.created_at.isoformat() if msg.created_at else None}}
                 )
     except WebSocketDisconnect:
-        manager.disconnect(user_id)
+        manager.disconnect(actual_user_id)
+    except Exception:
+        manager.disconnect(actual_user_id)
+        try:
+            await websocket.close(code=4001)
+        except Exception:
+            pass

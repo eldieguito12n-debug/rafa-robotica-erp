@@ -3,6 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from ...core.database import get_db
 from ...core.security import get_current_user, require_roles
+from ...core.activity_middleware import log_activity
 from ...models import User, UserRole, Developer, Client
 from ...schemas import User as UserSchema, UserUpdate, DeveloperCreate, Developer as DeveloperSchema, ClientCreate, Client as ClientSchema
 
@@ -46,6 +47,8 @@ def update_user(
         raise HTTPException(status_code=404, detail="User not found")
     for key, value in data.model_dump(exclude_unset=True).items():
         setattr(user, key, value)
+    db.flush()
+    log_activity(db, current_user.id, "actualizar", "user", user.id, data.model_dump(exclude_unset=True))
     db.commit()
     db.refresh(user)
     return user
@@ -61,6 +64,8 @@ def delete_user(
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     user.is_active = False
+    db.flush()
+    log_activity(db, current_user.id, "eliminar", "user", user.id, {"email": user.email, "full_name": user.full_name})
     db.commit()
     return {"message": "User deactivated"}
 
@@ -87,6 +92,8 @@ def create_developer(
 ):
     dev = Developer(**data.model_dump())
     db.add(dev)
+    db.flush()
+    log_activity(db, current_user.id, "crear", "developer", dev.id, data.model_dump())
     db.commit()
     db.refresh(dev)
     return dev
@@ -108,6 +115,8 @@ def update_developer(dev_id: int, data: dict, db: Session = Depends(get_db), cur
     for k, v in data.items():
         if hasattr(dev, k):
             setattr(dev, k, v)
+    db.flush()
+    log_activity(db, current_user.id, "actualizar", "developer", dev.id, data)
     db.commit()
     db.refresh(dev)
     return dev
@@ -126,6 +135,8 @@ def list_clients(search: Optional[str] = None, db: Session = Depends(get_db), cu
 def create_client(data: ClientCreate, db: Session = Depends(get_db), current_user: User = Depends(require_roles("administrador", "contador"))):
     c = Client(**data.model_dump())
     db.add(c)
+    db.flush()
+    log_activity(db, current_user.id, "crear", "client", c.id, data.model_dump())
     db.commit()
     db.refresh(c)
     return c

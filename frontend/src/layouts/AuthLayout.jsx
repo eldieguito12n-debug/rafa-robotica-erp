@@ -67,7 +67,7 @@ export default function AuthLayout() {
               <FaRobot size={30} className="text-white" />
             </div>
             <div>
-              <h1 className="text-3xl font-black heading-glow">RoboLab ERP</h1>
+              <h1 className="text-3xl font-black heading-glow">RAFA ROBOTICA</h1>
               <p className="text-sm text-dark-400">Sistema Inteligente de Laboratorio</p>
             </div>
           </div>

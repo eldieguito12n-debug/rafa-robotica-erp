@@ -16,7 +16,7 @@ export default function AIAssistant() {
   const [messages, setMessages] = useState(() => [
     {
       role: 'assistant',
-      content: '¡Hola! Soy tu asistente inteligente de RoboLab 🤖. Puedo ayudarte a analizar productividad, revisar inventario, generar reportes y mucho más. ¿En qué puedo ayudarte hoy?',
+      content: '¡Hola! Soy tu asistente inteligente de RAFA ROBOTICA 🤖. Puedo ayudarte a analizar productividad, revisar inventario, generar reportes y mucho más. ¿En qué puedo ayudarte hoy?',
     },
   ]);
   const [input, setInput] = useState('');

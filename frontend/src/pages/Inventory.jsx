@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
   FaBoxes, FaSearch, FaPlus, FaArrowDown, FaArrowUp, FaQrcode, FaBarcode,
@@ -7,10 +7,29 @@ import {
 } from 'react-icons/fa';
 import { inventoryAPI } from '../lib/api';
 import { cn, formatCurrency, formatDate, formatNumber, getStatusBadge } from '../lib/utils';
+import { useAppData } from '../context/AppDataContext';
 
 const cats = ['','arduino','esp32','motores','servomotores','sensores','baterias','camaras','impresiones_3d','herramientas','consumibles','otros'];
 
+const emptyItemForm = {
+  name: '',
+  category: '',
+  sku: '',
+  quantity: 0,
+  min_stock: 0,
+  unit_cost: 0,
+  supplier: '',
+  location: '',
+};
+
+const emptyMoveForm = {
+  quantity: '',
+  reference: '',
+  notes: '',
+};
+
 export default function Inventory() {
+  const { addToast } = useAppData();
   const [items, setItems] = useState([]);
   const [alerts, setAlerts] = useState({ total_alerts: 0, items: [] });
   const [loading, setLoading] = useState(true);
@@ -18,35 +37,113 @@ export default function Inventory() {
   const [cat, setCat] = useState('');
   const [lowOnly, setLowOnly] = useState(false);
 
-  const load = async () => {
+  const [showNew, setShowNew] = useState(false);
+  const [itemForm, setItemForm] = useState(emptyItemForm);
+  const [editingItem, setEditingItem] = useState(null);
+  const [savingItem, setSavingItem] = useState(false);
+
+  const [moveType, setMoveType] = useState(null);
+  const [moveItem, setMoveItem] = useState(null);
+  const [moveForm, setMoveForm] = useState(emptyMoveForm);
+  const [savingMove, setSavingMove] = useState(false);
+
+  const load = useCallback(async () => {
     setLoading(true);
     try {
       const [r, a] = await Promise.all([
-        inventoryAPI.list({ category: cat || undefined, low_stock: lowOnly, search: search || undefined, limit: 200 }).catch(() => ({ data: [] })),
+        inventoryAPI.list({ category: cat || undefined, low_stock: lowOnly || undefined, search: search || undefined, limit: 200 }),
         inventoryAPI.alerts().catch(() => ({ data: { total_alerts: 0, items: [] } })),
       ]);
-      setItems(r.data);
-      setAlerts(a.data);
-    } catch {} finally { setLoading(false); }
-  };
+      setItems(Array.isArray(r?.data) ? r.data : []);
+      setAlerts(a?.data || { total_alerts: 0, items: [] });
+    } catch (e) {
+      addToast('Error cargando inventario', 'error');
+      setItems([]);
+    } finally { setLoading(false); }
+  }, [cat, lowOnly, search, addToast]);
 
   useEffect(() => { load(); }, [cat, lowOnly, search]);
 
-  const mock = [
-    { id: 1, name: 'Arduino Uno R3', category: 'arduino', sku: 'ARD-UNO-001', quantity: 50, min_stock: 10, unit_cost: 45000, supplier: 'Arduino Store', location: 'Estante A-1', low_stock_alert: false },
-    { id: 2, name: 'ESP32 DevKit V1', category: 'esp32', sku: 'ESP-32-001', quantity: 35, min_stock: 8, unit_cost: 75000, supplier: 'Espressif', location: 'Estante A-2', low_stock_alert: false },
-    { id: 3, name: 'Servomotor SG90 Micro', category: 'servomotores', sku: 'SRV-SG90-001', quantity: 80, min_stock: 20, unit_cost: 12000, supplier: 'TowerPro', location: 'Estante B-3', low_stock_alert: false },
-    { id: 4, name: 'Sensor Ultrasónico HC-SR04', category: 'sensores', sku: 'SNS-ULT-001', quantity: 3, min_stock: 10, unit_cost: 18000, supplier: 'Generic', location: 'Estante C-1', low_stock_alert: true },
-    { id: 5, name: 'Motor DC 6V 200RPM', category: 'motores', sku: 'MTR-DC-001', quantity: 25, min_stock: 10, unit_cost: 25000, supplier: 'Generic', location: 'Estante B-1', low_stock_alert: false },
-    { id: 6, name: 'Batería LiPo 11.1V 2200mAh', category: 'baterias', sku: 'BAT-LIPO-001', quantity: 8, min_stock: 5, unit_cost: 95000, supplier: 'Tattu', location: 'Gabinetes Seguridad', low_stock_alert: false },
-    { id: 7, name: 'Raspberry Pi Camera V2 8MP', category: 'camaras', sku: 'CAM-RPI-001', quantity: 12, min_stock: 3, unit_cost: 120000, supplier: 'Raspberry', location: 'Estante C-4', low_stock_alert: false },
-    { id: 8, name: 'Filamento PLA 1kg Blanco', category: 'impresiones_3d', sku: 'FIL-PLA-001', quantity: 3, min_stock: 15, unit_cost: 85000, supplier: 'Prusa', location: 'Estante D-2', low_stock_alert: true },
-    { id: 9, name: 'Soldador Estaño 60W Premium', category: 'herramientas', sku: 'HERR-SOL-001', quantity: 5, min_stock: 2, unit_cost: 120000, supplier: 'Weller', location: 'Cajón Herramientas', low_stock_alert: false },
-    { id: 10, name: 'Resistencias Mix 1/4W (500 pcs)', category: 'consumibles', sku: 'CONS-RES-001', quantity: 500, min_stock: 100, unit_cost: 50000, supplier: 'Generic', location: 'Cajón Componentes', low_stock_alert: false },
-    { id: 11, name: 'Sensor DHT22 Temp/Humedad', category: 'sensores', sku: 'SNS-DHT-001', quantity: 2, min_stock: 8, unit_cost: 35000, supplier: 'Aosong', location: 'Estante C-2', low_stock_alert: true },
-    { id: 12, name: 'Driver Motor L298N', category: 'arduino', sku: 'DRV-L298-001', quantity: 1, min_stock: 6, unit_cost: 42000, supplier: 'ST', location: 'Estante A-3', low_stock_alert: true },
-  ];
-  const list = (items.length ? items : mock).filter(i =>
+  const openNewItem = () => {
+    setEditingItem(null);
+    setItemForm(emptyItemForm);
+    setShowNew(true);
+  };
+
+  const openEditItem = (it) => {
+    setEditingItem(it.id);
+    setItemForm({
+      name: it.name || '',
+      category: it.category || '',
+      sku: it.sku || '',
+      quantity: it.quantity || 0,
+      min_stock: it.min_stock || 0,
+      unit_cost: it.unit_cost || 0,
+      supplier: it.supplier || '',
+      location: it.location || '',
+    });
+    setShowNew(true);
+  };
+
+  const handleItemSubmit = async (e) => {
+    e.preventDefault();
+    setSavingItem(true);
+    const payload = { ...itemForm };
+    if (payload.quantity) payload.quantity = Number(payload.quantity);
+    if (payload.min_stock) payload.min_stock = Number(payload.min_stock);
+    if (payload.unit_cost) payload.unit_cost = Number(payload.unit_cost);
+    try {
+      if (editingItem) {
+        await inventoryAPI.update(editingItem, payload);
+        addToast('Artículo actualizado', 'success');
+      } else {
+        await inventoryAPI.create(payload);
+        addToast('Artículo creado', 'success');
+      }
+      setShowNew(false);
+      load();
+    } catch (err) {
+      addToast(err?.response?.data?.detail || 'Error guardando artículo', 'error');
+    } finally {
+      setSavingItem(false);
+    }
+  };
+
+  const handleDeleteItem = async (it) => {
+    if (!confirm(`¿Eliminar "${it.name}" del inventario?`)) return;
+    try {
+      await inventoryAPI.remove(it.id);
+      addToast('Artículo eliminado', 'success');
+      load();
+    } catch {
+      addToast('Error eliminando artículo', 'error');
+    }
+  };
+
+  const openMove = (type, it) => {
+    setMoveType(type);
+    setMoveItem(it);
+    setMoveForm(emptyMoveForm);
+  };
+
+  const handleMoveSubmit = async (e) => {
+    e.preventDefault();
+    if (!moveItem || !moveType) return;
+    setSavingMove(true);
+    try {
+      await inventoryAPI.move(moveItem.id, moveType, Number(moveForm.quantity), moveForm.reference || undefined, moveForm.notes || undefined);
+      addToast(`Movimiento de ${moveType === 'entrada' ? 'entrada' : 'salida'} registrado`, 'success');
+      setMoveType(null);
+      setMoveItem(null);
+      load();
+    } catch (err) {
+      addToast(err?.response?.data?.detail || 'Error registrando movimiento', 'error');
+    } finally {
+      setSavingMove(false);
+    }
+  };
+
+  const list = (items || []).filter(i =>
     !search || i.name.toLowerCase().includes(search.toLowerCase()) || (i.sku || '').toLowerCase().includes(search.toLowerCase())
   );
 
@@ -83,7 +180,7 @@ export default function Inventory() {
           </button>
           <button className="btn-secondary !px-3 !py-2 !text-sm"><FaFilter size={12} /></button>
           <button className="btn-secondary !px-3 !py-2 !text-sm"><FaFileExport size={12} /> Excel</button>
-          <button className="btn-primary !px-3 !py-2 !text-sm"><FaPlus size={12} /> Nuevo Item</button>
+          <button className="btn-primary !px-3 !py-2 !text-sm" onClick={openNewItem}><FaPlus size={12} /> Nuevo Item</button>
         </div>
       </motion.div>
 
@@ -94,7 +191,7 @@ export default function Inventory() {
         <MiniStat label="Alertas Stock Bajo" value={formatNumber(alerts.total_alerts || totals.low)} icon={FaExclamationTriangle} color={totals.low > 0 ? 'red' : 'green'} highlight={totals.low > 0} />
       </div>
 
-      {alerts.total_alerts > 0 && (
+      {(alerts.total_alerts || 0) > 0 && (
         <motion.div initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} className="rounded-2xl p-4 bg-neon-yellow/10 border border-neon-yellow/30 flex items-start gap-3">
           <FaExclamationTriangle size={18} className="text-neon-yellow flex-shrink-0 mt-0.5 animate-pulse" />
           <div className="flex-1">
@@ -153,7 +250,7 @@ export default function Inventory() {
                         it.category === 'motores' || it.category === 'servomotores' ? 'bg-neon-purple/10 text-neon-purple border-neon-purple/30' :
                         it.category === 'impresiones_3d' || it.category === 'consumibles' ? 'bg-neon-yellow/10 text-neon-yellow border-neon-yellow/30' :
                         'bg-dark-600/40 text-dark-300 border-dark-500/40'
-                      )}>{String(it.category).replace(/_/g,' ')}</span>
+                      )}>{String(it.category || 'otros').replace(/_/g,' ')}</span>
                     </td>
                     <td className="py-3 px-4 hidden lg:table-cell"><span className="font-mono text-xs text-dark-400">{it.sku || '—'}</span></td>
                     <td className="py-3 px-4">
@@ -175,11 +272,12 @@ export default function Inventory() {
                     </td>
                     <td className="py-3 px-4">
                       <div className="flex items-center justify-center gap-1 flex-wrap">
-                        <button className="w-8 h-8 rounded-lg hover:bg-neon-green/15 text-neon-green flex items-center justify-center" title="Entrada"><FaArrowDown size={11} /></button>
-                        <button className="w-8 h-8 rounded-lg hover:bg-primary-500/15 text-primary-300 flex items-center justify-center" title="Salida"><FaArrowUp size={11} /></button>
+                        <button onClick={() => openMove('entrada', it)} className="w-8 h-8 rounded-lg hover:bg-neon-green/15 text-neon-green flex items-center justify-center" title="Entrada"><FaArrowDown size={11} /></button>
+                        <button onClick={() => openMove('salida', it)} className="w-8 h-8 rounded-lg hover:bg-primary-500/15 text-primary-300 flex items-center justify-center" title="Salida"><FaArrowUp size={11} /></button>
                         <button className="w-8 h-8 rounded-lg hover:bg-dark-700/60 text-dark-400 flex items-center justify-center" title="QR"><FaQrcode size={11} /></button>
                         <button className="w-8 h-8 rounded-lg hover:bg-dark-700/60 text-dark-400 flex items-center justify-center hidden md:inline-flex" title="Barras"><FaBarcode size={11} /></button>
-                        <button className="w-8 h-8 rounded-lg hover:bg-primary-500/15 text-primary-300 flex items-center justify-center" title="Editar"><FaEdit size={11} /></button>
+                        <button onClick={() => openEditItem(it)} className="w-8 h-8 rounded-lg hover:bg-primary-500/15 text-primary-300 flex items-center justify-center" title="Editar"><FaEdit size={11} /></button>
+                        <button onClick={() => handleDeleteItem(it)} className="w-8 h-8 rounded-lg hover:bg-red-600/15 text-red-400 flex items-center justify-center" title="Eliminar"><FaTrash size={11} /></button>
                       </div>
                     </td>
                   </motion.tr>
@@ -189,6 +287,97 @@ export default function Inventory() {
           </table>
         </div>
       </div>
+
+      {showNew && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-sm" onClick={() => setShowNew(false)} />
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-2xl w-[95vw] mx-auto p-6 shadow-glass relative z-10">
+            <h3 className="text-xl font-bold heading-glow mb-1">{editingItem ? 'Editar Artículo' : 'Nuevo Artículo'}</h3>
+            <p className="text-xs text-dark-400 mb-5">Datos del artículo de inventario</p>
+            <form onSubmit={handleItemSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Nombre *</label>
+                  <input required value={itemForm.name} onChange={e => setItemForm({ ...itemForm, name: e.target.value })} className="input-field" placeholder="Ej: Arduino Uno R3" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Categoría</label>
+                  <select value={itemForm.category} onChange={e => setItemForm({ ...itemForm, category: e.target.value })} className="input-field">
+                    <option value="">Seleccionar...</option>
+                    {cats.filter(Boolean).map(c => <option key={c} value={c}>{c.replace(/_/g,' ')}</option>)}
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">SKU</label>
+                  <input value={itemForm.sku} onChange={e => setItemForm({ ...itemForm, sku: e.target.value })} className="input-field" placeholder="Ej: ARD-UNO-001" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Cantidad Inicial</label>
+                  <input type="number" min="0" value={itemForm.quantity} onChange={e => setItemForm({ ...itemForm, quantity: e.target.value })} className="input-field" placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Stock Mínimo</label>
+                  <input type="number" min="0" value={itemForm.min_stock} onChange={e => setItemForm({ ...itemForm, min_stock: e.target.value })} className="input-field" placeholder="0" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Costo Unitario</label>
+                  <input type="number" min="0" value={itemForm.unit_cost} onChange={e => setItemForm({ ...itemForm, unit_cost: e.target.value })} className="input-field" placeholder="0" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Proveedor</label>
+                  <input value={itemForm.supplier} onChange={e => setItemForm({ ...itemForm, supplier: e.target.value })} className="input-field" placeholder="Nombre proveedor" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Ubicación</label>
+                  <input value={itemForm.location} onChange={e => setItemForm({ ...itemForm, location: e.target.value })} className="input-field" placeholder="Ej: Estante A-1" />
+                </div>
+              </div>
+              <div className="flex gap-2 pt-3 border-t border-dark-600/40 justify-end">
+                <button type="button" onClick={() => setShowNew(false)} className="btn-secondary">Cancelar</button>
+                <button type="submit" disabled={savingItem} className="btn-primary">{savingItem ? 'Guardando...' : (editingItem ? 'Guardar Cambios' : 'Crear Artículo')}</button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
+
+      {moveType && moveItem && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-sm" onClick={() => { setMoveType(null); setMoveItem(null); }} />
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-md w-[95vw] mx-auto p-6 shadow-glass relative z-10">
+            <h3 className="text-xl font-bold heading-glow mb-1">
+              {moveType === 'entrada' ? '📥 Entrada de Inventario' : '📤 Salida de Inventario'}
+            </h3>
+            <p className="text-xs text-dark-400 mb-4">
+              Item: <span className="text-white font-semibold">{moveItem.name}</span> · Stock actual: <span className="font-mono">{moveItem.quantity} u</span>
+            </p>
+            <form onSubmit={handleMoveSubmit} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Cantidad *</label>
+                <input type="number" required min="1" value={moveForm.quantity} onChange={e => setMoveForm({ ...moveForm, quantity: e.target.value })} className="input-field" placeholder="Cantidad de unidades" />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Referencia / N° Factura</label>
+                <input value={moveForm.reference} onChange={e => setMoveForm({ ...moveForm, reference: e.target.value })} className="input-field" placeholder="Ej: FAC-00123, Ajuste..." />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Notas</label>
+                <textarea value={moveForm.notes} onChange={e => setMoveForm({ ...moveForm, notes: e.target.value })} className="input-field min-h-[70px]" placeholder="Observaciones..." />
+              </div>
+              <div className="flex gap-2 pt-3 border-t border-dark-600/40 justify-end">
+                <button type="button" onClick={() => { setMoveType(null); setMoveItem(null); }} className="btn-secondary">Cancelar</button>
+                <button type="submit" disabled={savingMove} className={moveType === 'entrada' ? 'btn-success' : 'btn-primary'}>
+                  {savingMove ? 'Procesando...' : (moveType === 'entrada' ? 'Registrar Entrada' : 'Registrar Salida')}
+                </button>
+              </div>
+            </form>
+          </motion.div>
+        </div>
+      )}
     </div>
   );
 }
@@ -199,7 +388,7 @@ function MiniStat({ label, value, icon: Ic, color, highlight }) {
     green: 'from-neon-green/20 to-transparent border-neon-green/30 text-neon-green',
     cyan: 'from-neon-blue/20 to-transparent border-neon-blue/30 text-neon-blue',
     red: 'from-red-500/20 to-transparent border-red-500/30 text-red-400',
-  }[color] || c.primary;
+  }[color] || 'from-primary-500/20 to-transparent border-primary-500/30 text-primary-300';
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }} whileInView={{ opacity: 1, y: 0 }} viewport={{ once: true }}

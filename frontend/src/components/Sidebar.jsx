@@ -27,10 +27,9 @@ const menu = [
   { group: 'Operaciones', items: [
     { to: '/inventory', label: 'Inventario', icon: FaBoxes, roles: null },
     { to: '/calendar', label: 'Calendario', icon: FaCalendarAlt, roles: null },
-    { to: '/chat', label: 'Chat Interno', icon: FaComments, roles: null },
+    { to: '/chat', label: 'Chat Global', icon: FaComments, roles: null },
   ]},
   { group: 'Negocios', items: [
-    { to: '/clients', label: 'Clientes', icon: FaUserFriends, roles: null },
     { to: '/quotes', label: 'Cotizaciones', icon: FaQuoteLeft, roles: null },
     { to: '/invoices', label: 'Facturas', icon: FaFileInvoiceDollar, roles: null },
     { to: '/financial', label: 'Finanzas', icon: FaCalculator, roles: ['administrador','contador','jefe_desarrollo'] },
@@ -71,7 +70,7 @@ export default function Sidebar() {
               <FaRobot size={22} className="text-white" />
             </div>
             <div className="flex-1 min-w-0">
-              <div className="font-black text-lg leading-tight heading-glow truncate">RoboLab ERP</div>
+              <div className="font-black text-lg leading-tight heading-glow truncate">RAFA ROBOTICA</div>
               <div className="text-[11px] text-dark-400 flex items-center gap-1">
                 <span className="w-1.5 h-1.5 rounded-full bg-neon-green animate-pulse" />
                 Smart Platform · v1.0
