@@ -139,7 +139,9 @@ export default function Tasks() {
     { id: 10, title: 'Tests de batería y autonomía', project_id: 1, project_name: 'Robot Autónomo', assigned_to_name: 'Fernanda Gómez', priority: 'media', status: 'pendiente', progress_percentage: 0, due_date: '2025-08-20', estimated_hours: 24, actual_hours: 0 },
   ];
   const list = tasks.map(t => ({
-    ...t, project_name: `Proyecto #${t.project_id}`, assigned_to_name: t.assigned_to_id ? `Usuario #${t.assigned_to_id}` : 'Sin asignar',
+    ...t, 
+    project_name: t.project?.name || `Proyecto #${t.project_id}`, 
+    assigned_to_name: t.assigned_to?.full_name || (t.assigned_to_id ? `Usuario #${t.assigned_to_id}` : 'Sin asignar'),
   })).filter(t =>
     (!search || t.title.toLowerCase().includes(search.toLowerCase()) || (t.project_name || '').toLowerCase().includes(search.toLowerCase())) &&
     (!status || t.status === status) &&

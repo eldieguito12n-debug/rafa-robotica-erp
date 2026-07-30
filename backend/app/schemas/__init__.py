@@ -147,6 +147,9 @@ class Task(TaskBase):
     history: List[Dict[str, Any]] = []
     created_at: Optional[datetime] = None
     updated_at: Optional[datetime] = None
+    assigned_to: Optional[User] = None
+    created_by: Optional[User] = None
+    project: Optional["ProjectBase"] = None
 
     class Config:
         from_attributes = True
