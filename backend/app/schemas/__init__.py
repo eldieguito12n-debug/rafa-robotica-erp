@@ -117,7 +117,7 @@ class TaskBase(BaseModel):
 class TaskCreate(TaskBase):
     project_id: Optional[int] = None
     assigned_to_id: Optional[int] = None
-    created_by_id: int
+    created_by_id: Optional[int] = None
 
 
 class TaskUpdate(BaseModel):

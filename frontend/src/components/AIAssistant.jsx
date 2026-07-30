@@ -1,8 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { FaRobot, FaTimes, FaPaperPlane, FaCogs, FaChartLine, FaLightbulb, FaMicrochip, FaBrain } from 'react-icons/fa';
+import { FaRobot, FaTimes, FaPaperPlane, FaCogs, FaChartLine, FaLightbulb, FaMicrochip, FaBrain, FaMarkdown } from 'react-icons/fa';
 import { useAppData } from '../context/AppDataContext';
 import { aiAPI } from '../lib/api';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 
 const quickPrompts = [
   { icon: FaChartLine, text: 'Resumen de productividad del mes', color: 'text-primary-400' },
@@ -16,7 +18,7 @@ export default function AIAssistant() {
   const [messages, setMessages] = useState(() => [
     {
       role: 'assistant',
-      content: '¡Hola! Soy tu asistente inteligente de RAFA ROBOTICA 🤖. Puedo ayudarte a analizar productividad, revisar inventario, generar reportes y mucho más. ¿En qué puedo ayudarte hoy?',
+      content: '¡Hola! Soy tu asistente inteligente avanzado de RAFA ROBOTICA v2.0 🤖. Puedo analizar datos, gestionar tareas, verificar el inventario y generar reportes. ¿En qué te ayudo hoy?',
     },
   ]);
   const [input, setInput] = useState('');
@@ -37,13 +39,29 @@ export default function AIAssistant() {
     setLoading(true);
     try {
       const res = await aiAPI.chat(prompt);
-      const msg = res.data;
-      setMessages(m => [
-        ...m,
-        { role: 'assistant', content: msg.response, suggestions: msg.suggestions },
-      ]);
+      const msg = res?.data || {};
+      
+      // Add empty message for streaming
+      setMessages(m => [...m, { role: 'assistant', content: '', suggestions: msg.suggestions || [] }]);
+      
+      // Simulate typing streaming
+      const fullContent = msg.response || "No pude procesar tu solicitud en este momento. Por favor, intenta de nuevo.";
+      let currentContent = '';
+      
+      for (let i = 0; i < fullContent.length; i++) {
+        await new Promise(r => setTimeout(r, 10)); // 10ms per char
+        currentContent += fullContent[i];
+        setMessages(m => {
+          const newM = [...m];
+          newM[newM.length - 1].content = currentContent;
+          return newM;
+        });
+      }
+      
     } catch (e) {
+      console.error(e);
       addToast('Error del asistente IA', 'error');
+      setMessages(m => [...m, { role: 'assistant', content: `Lo siento, ocurrió un error al comunicarme con el servidor. ⚠️ Detalles: ${e.message} ${e.response?.data?.detail || ''}` }]);
     } finally {
       setLoading(false);
     }
@@ -110,13 +128,26 @@ export default function AIAssistant() {
                   }`}>
                     {m.role === 'user' ? 'U' : <FaRobot size={14} className="text-dark-950" />}
                   </div>
-                  <div className={`max-w-[80%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
+                  <div className={`max-w-[85%] rounded-2xl px-4 py-3 text-sm leading-relaxed ${
                     m.role === 'user'
                       ? 'bg-primary-600/25 border border-primary-500/30 text-white'
-                      : 'bg-dark-700/60 border border-dark-600/60 text-dark-100'
+                      : 'bg-dark-700/60 border border-dark-600/60 text-dark-100 markdown-body'
                   }`}>
-                    {m.content}
-                    {m.suggestions && (
+                    {m.role === 'user' ? (
+                      m.content
+                    ) : (
+                      <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                        p: ({node, ...props}) => <p className="mb-2 last:mb-0" {...props} />,
+                        ul: ({node, ...props}) => <ul className="list-disc pl-4 mb-2" {...props} />,
+                        ol: ({node, ...props}) => <ol className="list-decimal pl-4 mb-2" {...props} />,
+                        li: ({node, ...props}) => <li className="mb-1" {...props} />,
+                        strong: ({node, ...props}) => <strong className="font-bold text-white" {...props} />,
+                        code: ({node, inline, ...props}) => inline ? <code className="bg-dark-900/50 text-neon-yellow px-1 py-0.5 rounded font-mono text-xs" {...props} /> : <code className="block bg-dark-900/80 p-2 rounded my-2 font-mono text-xs overflow-x-auto" {...props} />,
+                      }}>
+                        {m.content}
+                      </ReactMarkdown>
+                    )}
+                    {m.suggestions && m.content.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-dark-600/50 flex flex-wrap gap-1.5">
                         {m.suggestions.map(s => (
                           <button

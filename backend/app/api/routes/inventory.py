@@ -4,7 +4,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from io import BytesIO
 from ...core.database import get_db
-from ...core.security import get_current_user, require_roles
+from ...core.security import get_current_user, require_roles, require_admin, is_admin
 from ...core.activity_middleware import log_activity
 from ...core.qr_code import generate_qr_bytes
 from ...models import InventoryItem, InventoryMovement, User
@@ -37,7 +37,7 @@ def list_inventory(
 def create_inventory_item(
     data: InventoryItemCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "tecnico")),
+    current_user: User = Depends(require_admin),
 ):
     item = InventoryItem(**data.model_dump())
     item.low_stock_alert = item.quantity <= item.min_stock
@@ -82,7 +82,7 @@ def update_inventory_item(
     item_id: int,
     data: InventoryItemUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
@@ -110,6 +110,11 @@ def move_inventory(
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:
         raise HTTPException(404, "Item not found")
+
+    if not is_admin(current_user):
+        if movement_type != "salida":
+            raise HTTPException(403, "Solo los administradores pueden registrar entradas")
+
     if movement_type == "salida" and item.quantity < quantity:
         raise HTTPException(400, "Not enough stock")
     if movement_type == "entrada":
@@ -129,7 +134,7 @@ def move_inventory(
 def delete_inventory_item(
     item_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador")),
+    current_user: User = Depends(require_admin),
 ):
     item = db.query(InventoryItem).filter(InventoryItem.id == item_id).first()
     if not item:

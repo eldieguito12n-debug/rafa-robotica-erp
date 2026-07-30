@@ -3,7 +3,7 @@ from sqlalchemy.orm import Session
 from typing import Optional, List
 from datetime import date
 from ...core.database import get_db
-from ...core.security import get_current_user, require_roles
+from ...core.security import get_current_user, is_admin
 from ...models import Project, Task, InventoryItem, InventoryMovement, FinancialRecord, Client, Lab, Message, Notification, CalendarEvent, ActivityLog, Developer, ProjectDeveloper, User, UserRole
 from ...schemas import User as UserSchema, UserUpdate, DashboardStats, Project, Task, InventoryItem, Lab
 
@@ -30,15 +30,18 @@ def get_dashboard_stats(
 
     monthly_sales = 0.0
     monthly_expenses = 0.0
-    records = db.query(FinancialRecord).filter(FinancialRecord.date >= first_day_month).all()
-    for r in records:
-        if r.type in ("ingreso", "venta"):
-            monthly_sales += r.amount or 0
-        elif r.type in ("egreso", "compra"):
-            monthly_expenses += r.amount or 0
-
-    monthly_profit = monthly_sales - monthly_expenses
-    new_clients = db.query(Client).filter(Client.created_at >= first_day_month).count()
+    monthly_profit = 0.0
+    new_clients = 0
+    
+    if is_admin(current_user):
+        records = db.query(FinancialRecord).filter(FinancialRecord.date >= first_day_month).all()
+        for r in records:
+            if r.type in ("ingreso", "venta"):
+                monthly_sales += r.amount or 0
+            elif r.type in ("egreso", "compra"):
+                monthly_expenses += r.amount or 0
+        monthly_profit = monthly_sales - monthly_expenses
+        new_clients = db.query(Client).filter(Client.created_at >= first_day_month).count()
 
     labs = db.query(Lab).all()
     recent_logs = db.query(ActivityLog).order_by(ActivityLog.created_at.desc()).limit(10).all()
@@ -132,14 +135,15 @@ def get_chart_data(
         return out
 
     color1, color2 = "#0066ff", "#00ff88"
-    if chart_type == "sales":
+    if chart_type == "sales" and is_admin(current_user):
         q = db.query(FinancialRecord).filter(FinancialRecord.type.in_(["ingreso", "venta"]))
         data1 = frange(q, ranges, FinancialRecord.date, amount_fld=FinancialRecord.amount)
+        from ...models import Invoice
         q2 = db.query(Invoice)
         data2 = frange(q2, ranges, Invoice.created_at, amount_fld=Invoice.total)
         label1, label2 = "Ventas ($)", "Facturas emitidas"
         color1, color2 = "#00ff88", "#00aaff"
-    elif chart_type == "expenses":
+    elif chart_type == "expenses" and is_admin(current_user):
         q = db.query(FinancialRecord).filter(FinancialRecord.type.in_(["egreso", "compra"]))
         data1 = frange(q, ranges, FinancialRecord.date, amount_fld=FinancialRecord.amount)
         q2 = db.query(InventoryMovement).filter(InventoryMovement.type == "entrada")

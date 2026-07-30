@@ -8,6 +8,7 @@ from ..core.database import Base
 
 class UserRole(str, enum.Enum):
     ADMIN = "administrador"
+    ADMINISTRADORA = "administradora"
     JEFE_DESARROLLO = "jefe_desarrollo"
     INGENIERO_ELECTRONICO = "ingeniero_electronico"
     PROGRAMADOR = "programador"
@@ -106,7 +107,7 @@ class User(Base):
     email = Column(String(255), unique=True, index=True, nullable=False)
     full_name = Column(String(255), nullable=False)
     hashed_password = Column(String(255), nullable=False)
-    role = Column(SQLEnum(UserRole), default=UserRole.PROGRAMADOR, nullable=False)
+    role = Column(String(50), default="programador", nullable=False)
     phone = Column(String(50))
     avatar_url = Column(String(500))
     is_active = Column(Boolean, default=True)

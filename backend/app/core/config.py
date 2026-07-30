@@ -25,8 +25,16 @@ class Settings(BaseSettings):
                     val = val.replace("postgres://", "postgresql+psycopg2://", 1)
                 elif val.startswith("postgresql://") and "+psycopg2" not in val:
                     val = val.replace("postgresql://", "postgresql+psycopg2://", 1)
+                
+                # Psycopg2 does not support "supa=" or "pgbouncer=" connection options.
+                if "?" in val:
+                    val = val.split("?")[0]
+                
                 return val
-        return self.DATABASE_URL
+        db_url = self.DATABASE_URL
+        if os.environ.get("VERCEL") and db_url.startswith("sqlite") and "/tmp/" not in db_url:
+            return "sqlite:////tmp/robolab_erp.db"
+        return db_url
 
     class Config:
         env_file = ".env"

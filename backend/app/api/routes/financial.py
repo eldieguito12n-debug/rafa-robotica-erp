@@ -5,7 +5,7 @@ from typing import Optional, List
 from datetime import date
 from io import BytesIO
 from ...core.database import get_db
-from ...core.security import get_current_user, require_roles
+from ...core.security import get_current_user, require_admin
 from ...core.activity_middleware import log_activity
 from ...core.pdf import generate_invoice_pdf_bytes, generate_quote_pdf_bytes
 from ...models import FinancialRecord, Invoice, Payment, Quote, Client, User
@@ -88,7 +88,7 @@ def list_invoices(
     status: Optional[str] = None,
     client_id: Optional[int] = None,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     q = db.query(Invoice)
     if status:
@@ -114,7 +114,7 @@ def create_invoice(
 
 
 @router.get("/invoices/{invoice_id}", response_model=InvoiceSchema)
-def get_invoice(invoice_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_invoice(invoice_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     i = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not i:
         raise HTTPException(404, "Invoice not found")
@@ -125,7 +125,7 @@ def get_invoice(invoice_id: int, db: Session = Depends(get_db), current_user: Us
 def download_invoice_pdf(
     invoice_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     i = db.query(Invoice).filter(Invoice.id == invoice_id).first()
     if not i:
@@ -181,7 +181,7 @@ def create_payment(
 
 
 @router.get("/payments", response_model=List[PaymentSchema])
-def list_payments(client_id: Optional[int] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_payments(client_id: Optional[int] = None, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     q = db.query(Payment)
     if client_id:
         q = q.filter(Payment.client_id == client_id)
@@ -190,7 +190,7 @@ def list_payments(client_id: Optional[int] = None, db: Session = Depends(get_db)
 
 # ===== QUOTES =====
 @router.get("/quotes", response_model=List[QuoteSchema])
-def list_quotes(status: Optional[str] = None, client_id: Optional[int] = None, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def list_quotes(status: Optional[str] = None, client_id: Optional[int] = None, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     q = db.query(Quote)
     if status:
         q = q.filter(Quote.status == status)
@@ -215,7 +215,7 @@ def create_quote(
 
 
 @router.get("/quotes/{quote_id}", response_model=QuoteSchema)
-def get_quote(quote_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_quote(quote_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     q = db.query(Quote).filter(Quote.id == quote_id).first()
     if not q:
         raise HTTPException(404, "Quote not found")
@@ -226,7 +226,7 @@ def get_quote(quote_id: int, db: Session = Depends(get_db), current_user: User =
 def download_quote_pdf(
     quote_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     q = db.query(Quote).filter(Quote.id == quote_id).first()
     if not q:
@@ -348,7 +348,7 @@ def delete_invoice(
 
 # ===== PAYMENTS: Detail, Update, Delete =====
 @router.get("/payments/{payment_id}", response_model=PaymentSchema)
-def get_payment(payment_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def get_payment(payment_id: int, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     p = db.query(Payment).filter(Payment.id == payment_id).first()
     if not p:
         raise HTTPException(404, "Payment not found")

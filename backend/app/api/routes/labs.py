@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from ...core.database import get_db
-from ...core.security import get_current_user, require_roles
+from ...core.security import get_current_user, require_roles, require_admin
 from ...core.activity_middleware import log_activity
 from ...models import Lab, User
 from ...schemas import Lab as LabSchema, LabCreate, LabUpdate
@@ -36,7 +36,7 @@ def list_labs(
 def create_lab(
     data: LabCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "jefe_desarrollo")),
+    current_user: User = Depends(require_admin),
 ):
     lab = Lab(**data.model_dump())
     db.add(lab)
@@ -60,7 +60,7 @@ def update_lab(
     lab_id: int,
     data: LabUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     l = db.query(Lab).filter(Lab.id == lab_id).first()
     if not l:
@@ -78,7 +78,7 @@ def update_lab(
 def delete_lab(
     lab_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador")),
+    current_user: User = Depends(require_admin),
 ):
     l = db.query(Lab).filter(Lab.id == lab_id).first()
     if not l:

@@ -6,6 +6,7 @@ from ...core.security import get_current_user, require_roles
 from ...core.activity_middleware import log_activity
 from ...models import User, UserRole, Developer, Client
 from ...schemas import User as UserSchema, UserUpdate, DeveloperCreate, Developer as DeveloperSchema, ClientCreate, Client as ClientSchema
+from ...core.security import require_admin
 
 router = APIRouter(prefix="/users", tags=["Users & Developers"])
 
@@ -17,7 +18,7 @@ def list_users(
     skip: int = 0,
     limit: int = 100,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "jefe_desarrollo")),
+    current_user: User = Depends(require_admin),
 ):
     q = db.query(User)
     if role:
@@ -40,7 +41,7 @@ def update_user(
     user_id: int,
     data: UserUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador")),
+    current_user: User = Depends(require_admin),
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -58,7 +59,7 @@ def update_user(
 def delete_user(
     user_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador")),
+    current_user: User = Depends(require_admin),
 ):
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
@@ -88,7 +89,7 @@ def list_developers(
 def create_developer(
     data: DeveloperCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "jefe_desarrollo")),
+    current_user: User = Depends(require_admin),
 ):
     dev = Developer(**data.model_dump())
     db.add(dev)
@@ -108,7 +109,7 @@ def get_developer(dev_id: int, db: Session = Depends(get_db), current_user: User
 
 
 @router.put("/developers/{dev_id}", response_model=DeveloperSchema)
-def update_developer(dev_id: int, data: dict, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+def update_developer(dev_id: int, data: dict, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     dev = db.query(Developer).filter(Developer.id == dev_id).first()
     if not dev:
         raise HTTPException(status_code=404, detail="Developer not found")
@@ -132,7 +133,7 @@ def list_clients(search: Optional[str] = None, db: Session = Depends(get_db), cu
 
 
 @router.post("/clients", response_model=ClientSchema)
-def create_client(data: ClientCreate, db: Session = Depends(get_db), current_user: User = Depends(require_roles("administrador", "contador"))):
+def create_client(data: ClientCreate, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     c = Client(**data.model_dump())
     db.add(c)
     db.flush()

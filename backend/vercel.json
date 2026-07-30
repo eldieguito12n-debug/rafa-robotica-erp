@@ -1,16 +1,10 @@
 {
   "devCommand": "uvicorn app.main:app --reload --port 8000",
   "functions": {
-    "api/index.py": {
+    "api/**/*.py": {
       "includeFiles": "app/**"
     }
   },
-  "rewrites": [
-    { "source": "/api/v1/(.*)", "destination": "/api/index.py" },
-    { "source": "/docs", "destination": "/api/index.py" },
-    { "source": "/openapi.json", "destination": "/api/index.py" },
-    { "source": "/ws/(.*)", "destination": "/api/index.py" }
-  ],
   "headers": [
     {
       "source": "/(.*)",

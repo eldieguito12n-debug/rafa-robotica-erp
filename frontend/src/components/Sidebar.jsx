@@ -17,40 +17,40 @@ const menu = [
     { to: '/dashboard', label: 'Dashboard', icon: FaTachometerAlt, roles: null, badge: 'Live' },
   ]},
   { group: 'Gestión', items: [
-    { to: '/users', label: 'Usuarios', icon: FaUsers, roles: ['administrador','jefe_desarrollo'] },
-    { to: '/developers', label: 'Desarrolladores', icon: FaUserTie, roles: null },
+    { to: '/users', label: 'Usuarios', icon: FaUsers, adminOnly: true },
+    { to: '/developers', label: 'Desarrolladores', icon: FaUserTie, adminOnly: true },
     { to: '/projects', label: 'Proyectos', icon: FaProjectDiagram, roles: null },
     { to: '/kanban', label: 'Tablero Kanban', icon: FaClipboardList, roles: null },
     { to: '/tasks', label: 'Tareas', icon: FaTasks, roles: null },
-    { to: '/labs', label: 'Laboratorios', icon: FaFlask, roles: null },
+    { to: '/labs', label: 'Laboratorios', icon: FaFlask, adminOnly: true },
   ]},
   { group: 'Operaciones', items: [
-    { to: '/inventory', label: 'Inventario', icon: FaBoxes, roles: null },
+    { to: '/inventory', label: 'Inventario', icon: FaBoxes, adminOnly: true },
     { to: '/calendar', label: 'Calendario', icon: FaCalendarAlt, roles: null },
     { to: '/chat', label: 'Chat Global', icon: FaComments, roles: null },
   ]},
   { group: 'Negocios', items: [
-    { to: '/quotes', label: 'Cotizaciones', icon: FaQuoteLeft, roles: null },
-    { to: '/invoices', label: 'Facturas', icon: FaFileInvoiceDollar, roles: null },
-    { to: '/financial', label: 'Finanzas', icon: FaCalculator, roles: ['administrador','contador','jefe_desarrollo'] },
+    { to: '/quotes', label: 'Cotizaciones', icon: FaQuoteLeft, adminOnly: true },
+    { to: '/invoices', label: 'Facturas', icon: FaFileInvoiceDollar, adminOnly: true },
+    { to: '/financial', label: 'Finanzas', icon: FaCalculator, adminOnly: true },
   ]},
   { group: 'Analítica', items: [
-    { to: '/reports', label: 'Reportes', icon: FaChartBar, roles: null },
+    { to: '/reports', label: 'Reportes', icon: FaChartBar, adminOnly: true },
   ]},
 ];
 
 export default function Sidebar() {
   const { sidebarOpen, setSidebarOpen } = useAppData();
-  const { user, logout, hasRole } = useAuth();
+  const { user, logout, hasRole, isAdmin } = useAuth();
   const { isDark, toggleTheme } = useTheme();
   const location = useLocation();
   const [confirming, setConfirming] = useState(false);
 
   return (
     <>
-      {!sidebarOpen && (
+      {sidebarOpen && (
         <div
-          className="fixed inset-0 bg-dark-950/70 backdrop-blur-sm z-40 lg:hidden"
+          className="fixed inset-0 bg-dark-950/70 z-40 lg:hidden"
           onClick={() => setSidebarOpen(false)}
         />
       )}
@@ -80,7 +80,11 @@ export default function Sidebar() {
 
           <div className="flex-1 overflow-y-auto p-3 space-y-5 pr-1">
             {menu.map((group) => {
-              const visible = group.items.filter(i => !i.roles || hasRole(...i.roles));
+              const visible = group.items.filter(i => {
+                if (i.adminOnly && !isAdmin()) return false;
+                if (i.roles) return hasRole(...i.roles);
+                return true;
+              });
               if (!visible.length) return null;
               return (
                 <div key={group.group}>

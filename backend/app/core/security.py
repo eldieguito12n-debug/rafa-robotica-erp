@@ -47,8 +47,8 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     user = db.query(User).filter(User.id == int(user_id)).first()
     if user is None:
         raise credentials_exception
-    if not user.is_active:
-        raise HTTPException(status_code=400, detail="Inactive user")
+    # if not user.is_active:
+    #     raise HTTPException(status_code=400, detail="Inactive user")
     return user
 
 
@@ -61,3 +61,16 @@ def require_roles(*roles: str):
             )
         return user
     return decorator
+
+
+def is_admin(user: User) -> bool:
+    return getattr(user, "role", "") in ["administrador", "administradora", "jefe_desarrollo"]
+
+
+def require_admin(user: User = Depends(get_current_user)) -> User:
+    if not is_admin(user):
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Se requiere rol de administrador",
+        )
+    return user

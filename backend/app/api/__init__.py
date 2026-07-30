@@ -11,6 +11,7 @@ from .routes.labs import router as labs_router
 from .routes.calendar import router as calendar_router
 from .routes.uploads import router as uploads_router
 from .routes.reports import router as reports_router
+from .routes.ai import router as ai_router
 
 api_router = APIRouter()
 
@@ -26,3 +27,4 @@ api_router.include_router(labs_router)
 api_router.include_router(calendar_router)
 api_router.include_router(uploads_router)
 api_router.include_router(reports_router)
+api_router.include_router(ai_router)

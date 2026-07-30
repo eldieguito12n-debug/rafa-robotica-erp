@@ -20,6 +20,7 @@ app = FastAPI(
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.BACKEND_CORS_ORIGINS if isinstance(settings.BACKEND_CORS_ORIGINS, list) else ["*"],
+    allow_origin_regex=r"https://.*\.vercel\.app",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -40,6 +41,24 @@ def root():
         "docs": "/docs",
         "api": settings.API_V1_STR,
     }
+
+
+from sqlalchemy import text
+
+@app.get("/api/v1/health")
+def health_check():
+    return {"status": "ok", "version": "1.0.0"}
+
+@app.get("/api/v1/fix_role")
+def fix_role():
+    from .core.database import engine
+    with engine.connect().execution_options(isolation_level="AUTOCOMMIT") as conn:
+        try:
+            conn.execute(text("ALTER TABLE users ALTER COLUMN role TYPE varchar(50) USING role::varchar;"))
+            conn.execute(text("DROP TYPE IF EXISTS userrole CASCADE;"))
+            return {"status": "success", "message": "Role converted to varchar"}
+        except Exception as e:
+            return {"status": "error", "message": str(e)}
 
 
 @app.get("/health", tags=["Health"])

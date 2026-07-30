@@ -28,8 +28,8 @@ import NotFound from './pages/NotFound.jsx';
 import Toasts from './components/ui/Toasts.jsx';
 import AIAssistant from './components/AIAssistant.jsx';
 
-function RequireAuth({ children, roles }) {
-  const { isAuthenticated, user, isLoading } = useAuth();
+function RequireAuth({ children, roles, adminOnly }) {
+  const { isAuthenticated, user, isLoading, isAdmin } = useAuth();
   const location = useLocation();
   if (isLoading) {
     return (
@@ -39,7 +39,9 @@ function RequireAuth({ children, roles }) {
     );
   }
   if (!isAuthenticated) return <Navigate to="/login" state={{ from: location }} replace />;
+  if (adminOnly && !isAdmin()) return <Navigate to="/dashboard" replace />;
   if (roles && user && !roles.includes(user.role)) return <Navigate to="/dashboard" replace />;
+
   return children;
 }
 
@@ -62,21 +64,21 @@ export default function App() {
           <Route element={<RequireAuth><AppLayout /></RequireAuth>}>
             <Route path="/" element={<Navigate to="/dashboard" replace />} />
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/users" element={<RequireAuth roles={['administrador','jefe_desarrollo']}><Users /></RequireAuth>} />
-            <Route path="/developers" element={<Developers />} />
+            <Route path="/users" element={<RequireAuth adminOnly><Users /></RequireAuth>} />
+            <Route path="/developers" element={<RequireAuth adminOnly><Developers /></RequireAuth>} />
             <Route path="/projects" element={<Projects />} />
             <Route path="/projects/:id" element={<ProjectDetail />} />
             <Route path="/kanban" element={<Kanban />} />
             <Route path="/tasks" element={<Tasks />} />
-            <Route path="/inventory" element={<Inventory />} />
-            <Route path="/labs" element={<Labs />} />
-            <Route path="/financial" element={<RequireAuth roles={['administrador','contador','jefe_desarrollo']}><Financial /></RequireAuth>} />
-            <Route path="/clients" element={<Clients />} />
-            <Route path="/quotes" element={<Quotes />} />
-            <Route path="/invoices" element={<Invoices />} />
+            <Route path="/inventory" element={<RequireAuth adminOnly><Inventory /></RequireAuth>} />
+            <Route path="/labs" element={<RequireAuth adminOnly><Labs /></RequireAuth>} />
+            <Route path="/financial" element={<RequireAuth adminOnly><Financial /></RequireAuth>} />
+            <Route path="/clients" element={<RequireAuth adminOnly><Clients /></RequireAuth>} />
+            <Route path="/quotes" element={<RequireAuth adminOnly><Quotes /></RequireAuth>} />
+            <Route path="/invoices" element={<RequireAuth adminOnly><Invoices /></RequireAuth>} />
             <Route path="/calendar" element={<Calendar />} />
             <Route path="/chat" element={<Chat />} />
-            <Route path="/reports" element={<Reports />} />
+            <Route path="/reports" element={<RequireAuth adminOnly><Reports /></RequireAuth>} />
           </Route>
           <Route path="*" element={<NotFound />} />
         </Routes>

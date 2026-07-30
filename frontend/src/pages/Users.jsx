@@ -9,9 +9,10 @@ import { useAppData } from '../context/AppDataContext';
 import { cn, formatDate, getStatusBadge } from '../lib/utils';
 import Avatar from '../components/ui/Avatar.jsx';
 
-const rolesList = ['administrador','jefe_desarrollo','ingeniero_electronico','programador','disenador_cad','tecnico','contador','cliente'];
+const rolesList = ['administrador','administradora','jefe_desarrollo','ingeniero_electronico','programador','disenador_cad','tecnico','contador','cliente'];
 const rolesSpanish = {
   administrador: 'Administrador',
+  administradora: 'Administradora',
   jefe_desarrollo: 'Jefe de Desarrollo',
   ingeniero_electronico: 'Ingeniero Electrónico',
   programador: 'Programador',
@@ -22,6 +23,7 @@ const rolesSpanish = {
 };
 const roleColors = {
   administrador: 'bg-neon-purple/15 text-neon-purple border-neon-purple/30',
+  administradora: 'bg-neon-purple/15 text-neon-purple border-neon-purple/30',
   jefe_desarrollo: 'bg-primary-500/15 text-primary-300 border-primary-500/30',
   ingeniero_electronico: 'bg-neon-yellow/15 text-neon-yellow border-neon-yellow/30',
   programador: 'bg-neon-blue/15 text-neon-blue border-neon-blue/30',

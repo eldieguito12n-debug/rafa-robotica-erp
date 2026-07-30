@@ -2,7 +2,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy.orm import Session
 from typing import Optional, List
 from ...core.database import get_db
-from ...core.security import get_current_user, require_roles
+from ...core.security import get_current_user, require_roles, require_admin, is_admin
 from ...core.activity_middleware import log_activity
 from ...models import Project, Task, ProjectDeveloper, User
 from ...schemas import Project as ProjectSchema, ProjectCreate, ProjectUpdate, ProjectDeveloperCreate, Task as TaskSchema, TaskCreate, TaskUpdate
@@ -43,6 +43,14 @@ def list_projects(
     current_user: User = Depends(get_current_user),
 ):
     q = db.query(Project)
+    
+    # Filter logic: if not admin, only show projects assigned to the user
+    if not is_admin(current_user):
+        if current_user.developer:
+            q = q.join(ProjectDeveloper).filter(ProjectDeveloper.developer_id == current_user.developer.id)
+        else:
+            q = q.filter(Project.id == 0) # empty
+
     if status:
         q = q.filter(Project.status == status)
     if client_id:
@@ -56,7 +64,7 @@ def list_projects(
 def create_project(
     data: ProjectCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "jefe_desarrollo")),
+    current_user: User = Depends(require_admin),
 ):
     p = Project(**data.model_dump())
     db.add(p)
@@ -80,7 +88,7 @@ def update_project(
     project_id: int,
     data: ProjectUpdate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     p = db.query(Project).filter(Project.id == project_id).first()
     if not p:
@@ -98,7 +106,7 @@ def update_project(
 def delete_project(
     project_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "jefe_desarrollo")),
+    current_user: User = Depends(require_admin),
 ):
     p = db.query(Project).filter(Project.id == project_id).first()
     if not p:
@@ -120,7 +128,7 @@ def add_developer_to_project(
     project_id: int,
     data: ProjectDeveloperCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user),
+    current_user: User = Depends(require_admin),
 ):
     pd = ProjectDeveloper(**data.model_dump())
     pd.project_id = project_id
@@ -168,6 +176,11 @@ def list_tasks(
     current_user: User = Depends(get_current_user),
 ):
     q = db.query(Task)
+    
+    # Filter logic: if not admin, only show assigned tasks
+    if not is_admin(current_user):
+        q = q.filter(Task.assigned_to_id == current_user.id)
+
     if status:
         q = q.filter(Task.status == status)
     if project_id:
@@ -183,7 +196,7 @@ def list_tasks(
 def create_task(
     data: TaskCreate,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "jefe_desarrollo")),
+    current_user: User = Depends(require_admin),
 ):
     t = Task(**data.model_dump())
     t.created_by_id = current_user.id
@@ -214,6 +227,16 @@ def update_task(
     t = db.query(Task).filter(Task.id == task_id).first()
     if not t:
         raise HTTPException(404, "Task not found")
+
+    if not is_admin(current_user):
+        if t.assigned_to_id != current_user.id:
+            raise HTTPException(403, "Not enough permissions to edit this task")
+        # Ensure non-admins can only change specific fields like status
+        allowed_fields = {"status", "progress_percentage"}
+        for k in data.model_dump(exclude_unset=True).keys():
+            if k not in allowed_fields:
+                raise HTTPException(403, f"Not allowed to edit field: {k}")
+
     old_project_id = t.project_id
     for k, v in data.model_dump(exclude_unset=True).items():
         setattr(t, k, v)
@@ -237,6 +260,10 @@ def update_task_status(
     t = db.query(Task).filter(Task.id == task_id).first()
     if not t:
         raise HTTPException(404, "Task not found")
+    
+    if not is_admin(current_user) and t.assigned_to_id != current_user.id:
+        raise HTTPException(403, "Not enough permissions to edit this task")
+
     t.status = status
     if status == "finalizado":
         t.progress_percentage = 100
@@ -251,7 +278,7 @@ def update_task_status(
 def delete_task(
     task_id: int,
     db: Session = Depends(get_db),
-    current_user: User = Depends(require_roles("administrador", "jefe_desarrollo")),
+    current_user: User = Depends(require_admin),
 ):
     t = db.query(Task).filter(Task.id == task_id).first()
     if not t:

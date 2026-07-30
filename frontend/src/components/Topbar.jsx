@@ -34,10 +34,11 @@ function getCrumb(pathname) {
 export default function Topbar() {
   const location = useLocation();
   const { setSidebarOpen, notifications, loadNotifications, unreadCount, setAiOpen, addToast } = useAppData();
-  const { user, hasRole } = useAuth();
+  const { user, hasRole, isAdmin } = useAuth();
   const [searchOpen, setSearchOpen] = useState(false);
   const [notifOpen, setNotifOpen] = useState(false);
   const [menuOpen, setMenuOpen] = useState(false);
+  const [createMenuOpen, setCreateMenuOpen] = useState(false);
   const [time, setTime] = useState(new Date());
 
   useEffect(() => {
@@ -92,14 +93,16 @@ export default function Topbar() {
             <span className="font-mono">{time.toLocaleDateString('es-CO', { day: '2-digit', month: 'short' })}</span>
           </div>
 
-          <button
-            onClick={() => setAiOpen(true)}
-            className="relative w-10 h-10 rounded-xl flex items-center justify-center hover:bg-gradient-to-br hover:from-primary-600/20 hover:to-neon-green/20 transition text-dark-300 hover:text-neon-green group"
-            title="Asistente IA"
-          >
-            <FaRobot size={18} className="group-hover:animate-bounce" />
-            <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-neon-green animate-pulse border-2 border-dark-800" />
-          </button>
+          {isAdmin() && (
+            <button
+              onClick={() => setAiOpen(true)}
+              className="relative w-10 h-10 rounded-xl flex items-center justify-center hover:bg-gradient-to-br hover:from-primary-600/20 hover:to-neon-green/20 transition text-dark-300 hover:text-neon-green group"
+              title="Asistente IA"
+            >
+              <FaRobot size={18} className="group-hover:animate-bounce" />
+              <span className="absolute -top-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-neon-green animate-pulse border-2 border-dark-800" />
+            </button>
+          )}
 
           <div className="relative">
             <button
@@ -167,14 +170,49 @@ export default function Topbar() {
             <FaCog size={15} />
           </button>
 
-          <button
-            onClick={() => addToast('Acciones rápidas próximamente', 'info')}
-            className="hidden md:flex items-center gap-2 btn-primary !px-3 !py-2 !text-sm"
-          >
-            <FaPlus size={12} />
-            <span>Nuevo</span>
-            <FaChevronDown size={10} />
-          </button>
+          <div className="relative">
+            <button
+              onClick={() => { setCreateMenuOpen(o => !o); setNotifOpen(false); }}
+              className="hidden md:flex items-center gap-2 btn-primary !px-3 !py-2 !text-sm"
+            >
+              <FaPlus size={12} />
+              <span>Nuevo</span>
+              <FaChevronDown size={10} />
+            </button>
+            <AnimatePresence>
+              {createMenuOpen && (
+                <motion.div
+                  initial={{ opacity: 0, y: 8, scale: 0.95 }}
+                  animate={{ opacity: 1, y: 0, scale: 1 }}
+                  exit={{ opacity: 0, y: 8, scale: 0.95 }}
+                  transition={{ duration: 0.15 }}
+                  onClick={e => e.stopPropagation()}
+                  className="absolute right-0 mt-2 w-48 glass rounded-xl overflow-hidden z-50 shadow-glass hud-corner"
+                >
+                  <div className="flex flex-col py-1">
+                    <button
+                      onClick={() => {
+                        setCreateMenuOpen(false);
+                        window.location.href = '/tasks?new=true';
+                      }}
+                      className="px-4 py-2 text-left text-sm text-dark-300 hover:bg-dark-700/60 hover:text-white transition"
+                    >
+                      Nueva Tarea
+                    </button>
+                    <button
+                      onClick={() => {
+                        setCreateMenuOpen(false);
+                        window.location.href = '/developers?new=true';
+                      }}
+                      className="px-4 py-2 text-left text-sm text-dark-300 hover:bg-dark-700/60 hover:text-white transition"
+                    >
+                      Nuevo Desarrollador
+                    </button>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
         </div>
       </div>
     </header>

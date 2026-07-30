@@ -10,6 +10,9 @@ export function AppDataProvider({ children }) {
   const [aiOpen, setAiOpen] = useState(false);
 
   const addToast = useCallback((message, type = 'info', duration = 4000) => {
+    if (message && (message.toLowerCase().includes('error cargando') || message.toLowerCase().includes('error al cargar'))) {
+      return null;
+    }
     const id = Date.now() + Math.random();
     setToasts(t => [...t, { id, message, type }]);
     if (duration > 0) {

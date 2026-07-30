@@ -19,6 +19,19 @@ export default function Tasks() {
   const [priority, setPriority] = useState('');
   const [view, setView] = useState('table');
 
+  const [showNew, setShowNew] = useState(
+    typeof window !== 'undefined' && window.location.search.includes('new=true')
+  );
+  const [saving, setSaving] = useState(false);
+  const [form, setForm] = useState({
+    title: '',
+    description: '',
+    project_id: 1,
+    priority: 'media',
+    status: 'pendiente',
+    estimated_hours: 8
+  });
+
   const load = async () => {
     setLoading(true);
     try {
@@ -32,6 +45,18 @@ export default function Tasks() {
   };
 
   useEffect(() => { load(); }, [status, priority]);
+
+  const handleAddQuickTask = () => {
+    setForm({
+      title: '',
+      description: '',
+      project_id: 1,
+      priority: 'media',
+      status: 'pendiente',
+      estimated_hours: 8
+    });
+    setShowNew(true);
+  };
 
   const mock = [
     { id: 1, title: 'Diseñar chasis del robot autónomo v2', project_id: 1, project_name: 'Robot Autónomo', assigned_to_name: 'Esteban López', created_by_id: 2, priority: 'alta', status: 'finalizado', progress_percentage: 100, due_date: '2025-02-10', estimated_hours: 24, actual_hours: 22, description: 'Diseño CAD del chasis principal con materiales ligeros' },
@@ -48,7 +73,9 @@ export default function Tasks() {
   const list = (tasks.length ? tasks.map(t => ({
     ...t, project_name: `Proyecto #${t.project_id}`, assigned_to_name: t.assigned_to_id ? `Usuario #${t.assigned_to_id}` : 'Sin asignar',
   })) : mock).filter(t =>
-    !search || t.title.toLowerCase().includes(search.toLowerCase()) || (t.project_name || '').toLowerCase().includes(search.toLowerCase())
+    (!search || t.title.toLowerCase().includes(search.toLowerCase()) || (t.project_name || '').toLowerCase().includes(search.toLowerCase())) &&
+    (!status || t.status === status) &&
+    (!priority || t.priority === priority)
   );
 
   const counts = {
@@ -91,7 +118,7 @@ export default function Tasks() {
             {priorities.filter(Boolean).map(p => <option key={p} value={p}>{p}</option>)}
           </select>
           <button className="btn-secondary !px-3 !py-2 !text-sm"><FaFilter size={12} /></button>
-          <button className="btn-primary !px-3 !py-2 !text-sm"><FaPlus size={12} /> Nueva Tarea</button>
+          <button className="btn-primary !px-3 !py-2 !text-sm" onClick={handleAddQuickTask}><FaPlus size={12} /> Nueva Tarea</button>
         </div>
       </motion.div>
 
@@ -195,6 +222,89 @@ export default function Tasks() {
               </div>
             </motion.div>
           ))}
+        </div>
+      )}
+
+      {showNew && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+          <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-sm" onClick={() => setShowNew(false)} />
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-2xl w-[95vw] mx-auto p-6 shadow-glass relative z-10">
+            <h3 className="text-xl font-bold heading-glow mb-1">Nueva Tarea</h3>
+            <p className="text-xs text-dark-400 mb-5">Creación de tarea para el tablero y cronograma</p>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              setSaving(true);
+              try {
+                await tasksAPI.create({
+                  title: form.title,
+                  description: form.description,
+                  project_id: Number(form.project_id),
+                  priority: form.priority,
+                  status: form.status,
+                  assigned_to_id: form.assigned_to_id || null,
+                  progress_percentage: 0,
+                  estimated_hours: Number(form.estimated_hours)
+                });
+                setShowNew(false);
+                load();
+              } catch (err) {
+                console.error(err);
+              } finally {
+                setSaving(false);
+              }
+            }} className="space-y-4">
+              <div>
+                <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Título de la Tarea *</label>
+                <input required value={form.title} onChange={e => setForm({ ...form, title: e.target.value })} className="input-field" placeholder="Ej: Diseñar placa base..." />
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Proyecto</label>
+                  <select value={form.project_id} onChange={e => setForm({ ...form, project_id: e.target.value })} className="input-field">
+                    <option value="1">Robot Autónomo</option>
+                    <option value="2">Sistema IoT Agrícola</option>
+                    <option value="3">Brazo 6DOF</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Asignar A (ID Usuario)</label>
+                  <input type="number" value={form.assigned_to_id || ''} onChange={e => setForm({ ...form, assigned_to_id: e.target.value ? Number(e.target.value) : null })} className="input-field" placeholder="ID del usuario (Opcional)" />
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Prioridad</label>
+                  <select value={form.priority} onChange={e => setForm({ ...form, priority: e.target.value })} className="input-field">
+                    <option value="baja">Baja</option>
+                    <option value="media">Media</option>
+                    <option value="alta">Alta</option>
+                    <option value="urgente">Urgente</option>
+                  </select>
+                </div>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Estado Inicial</label>
+                  <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="input-field">
+                    <option value="pendiente">Pendiente</option>
+                    <option value="en_proceso">En Proceso</option>
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Horas Estimadas</label>
+                  <input type="number" min="0" value={form.estimated_hours} onChange={e => setForm({ ...form, estimated_hours: e.target.value })} className="input-field" placeholder="8" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Descripción (Opcional)</label>
+                <textarea value={form.description} onChange={e => setForm({ ...form, description: e.target.value })} className="input-field min-h-[80px]" placeholder="Detalles de la tarea..." />
+              </div>
+              <div className="flex gap-2 pt-3 border-t border-dark-600/40 justify-end">
+                <button type="button" onClick={() => setShowNew(false)} className="btn-secondary">Cancelar</button>
+                <button type="submit" disabled={saving} className="btn-primary">{saving ? 'Guardando...' : 'Crear Tarea'}</button>
+              </div>
+            </form>
+          </motion.div>
         </div>
       )}
     </div>

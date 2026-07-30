@@ -7,7 +7,7 @@ from datetime import date, datetime
 from io import BytesIO
 from calendar import monthrange
 from ...core.database import get_db
-from ...core.security import require_roles
+from ...core.security import get_current_user, require_admin
 from ...core.excel import generate_report_excel_bytes, generate_inventory_excel_bytes
 from ...core.pdf import generate_financial_summary_pdf_bytes
 from ...models import FinancialRecord, InventoryItem, Project, User, ProjectStatus

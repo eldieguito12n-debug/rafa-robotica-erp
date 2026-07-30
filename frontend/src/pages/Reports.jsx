@@ -108,7 +108,7 @@ export default function Reports() {
         <div className="card hud-corner lg:col-span-2">
           <div className="flex items-center justify-between mb-4">
             <div>
-              <h3 className="font-bold text-lg flex items-center gap-2"><FaBarChart className="text-neon-green"/> Ingresos vs Egresos (Acumulado)</h3>
+              <h3 className="font-bold text-lg flex items-center gap-2"><FaChartBar className="text-neon-green"/> Ingresos vs Egresos (Acumulado)</h3>
               <p className="text-xs text-dark-400">Comparativo por mes del año en curso</p>
             </div>
           </div>
