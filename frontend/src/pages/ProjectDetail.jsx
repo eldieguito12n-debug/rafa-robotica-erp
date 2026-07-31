@@ -29,14 +29,7 @@ export default function ProjectDetail() {
     { id: 'finance', label: 'Finanzas', icon: FaDollarSign },
   ];
 
-  const tasks = [
-    { id: 1, title: 'Diseñar chasis del robot', status: 'finalizado', progress: 100, priority: 'alta', dev: 'Esteban López', due: '2025-02-10' },
-    { id: 2, title: 'Integrar sensor LIDAR', status: 'en_progreso', progress: 60, priority: 'urgente', dev: 'Diana Torres', due: '2025-08-05' },
-    { id: 3, title: 'Algoritmo de navegación SLAM', status: 'en_progreso', progress: 40, priority: 'alta', dev: 'Carlos Vega', due: '2025-08-12' },
-    { id: 4, title: 'Diseñar PCB controladora', status: 'pendiente', progress: 0, priority: 'media', dev: 'Diana Torres', due: '2025-08-09' },
-    { id: 5, title: 'Sistema de recarga inalámbrica', status: 'pendiente', progress: 0, priority: 'baja', dev: 'Diana Torres', due: '2025-10-01' },
-    { id: 6, title: 'Pruebas de estrés mecánico', status: 'pendiente', progress: 0, priority: 'media', dev: 'Fernanda Gómez', due: '2025-11-15' },
-  ];
+  const tasks = project?.tasks || [];
 
   const team = [
     { name: 'Laura Martínez', role: 'Jefe de Proyecto', hours: 160 },
@@ -162,7 +155,7 @@ export default function ProjectDetail() {
                       <tr key={t.id} className="border-b border-dark-700/40 hover:bg-dark-700/30">
                         <td className="py-3 px-2 font-medium">{t.title}</td>
                         <td className="py-3 px-2 hidden sm:table-cell">
-                          <div className="flex items-center gap-2"><Avatar size="xs" name={t.dev} id={t.id} />{t.dev}</div>
+                          <div className="flex items-center gap-2"><Avatar size="xs" name={t.assigned_to?.full_name || 'Sin Asignar'} id={t.assigned_to_id || t.id} />{t.assigned_to?.full_name || 'Sin Asignar'}</div>
                         </td>
                         <td className="py-3 px-2"><span className={getStatusBadge(t.priority)}>{t.priority}</span></td>
                         <td className="py-3 px-2 text-xs text-dark-400 hidden md:table-cell">{formatDate(t.due)}</td>
