@@ -114,15 +114,14 @@ export default function Financial() {
         </div>
       </motion.div>
 
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
         <FinCard label="Total Ingresos" value={s.total_ingresos} icon={FaArrowUp} color="green" sub={`${list.filter(r => ['ingreso','venta'].includes(r.type)).length} movimientos`} />
         <FinCard label="Total Egresos" value={s.total_egresos} icon={FaArrowDown} color="red" sub={`${list.filter(r => ['egreso','compra'].includes(r.type)).length} movimientos`} />
         <FinCard label="Utilidad / Pérdida" value={s.utilidad} icon={FaChartPie} color={s.utilidad >= 0 ? 'cyan' : 'red'} sub={s.utilidad >= 0 ? 'Resultado positivo' : 'En rojo'} positive={s.utilidad >= 0} />
-        <FinCard label="Caja Diaria" value={s.caja_diaria || 18500000} icon={FaDollarSign} color="purple" sub="Efectivo + bancos" />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="card hud-corner lg:col-span-2">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+        <div className="card hud-corner">
           <div className="flex items-center justify-between mb-4">
             <div>
               <h3 className="font-bold text-lg">Flujo de Caja (Últimos 6 meses)</h3>
@@ -145,8 +144,8 @@ export default function Financial() {
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-        <div className="card hud-corner lg:col-span-2 !p-0 overflow-hidden">
+      <div className="grid grid-cols-1 gap-4">
+        <div className="card hud-corner !p-0 overflow-hidden">
           <div className="p-5 border-b border-dark-600/50 flex items-center justify-between">
             <h3 className="font-bold text-lg flex items-center gap-2"><FaFileInvoiceDollar className="text-primary-400" /> Movimientos Recientes</h3>
             <span className="text-xs badge-info">{list.length} registros</span>
@@ -191,28 +190,6 @@ export default function Financial() {
               </tbody>
             </table>
           </div>
-        </div>
-
-        <div className="card hud-corner">
-          <h3 className="font-bold text-lg mb-4">Ingresos por Proyecto</h3>
-          <BarChart
-            labels={['P#001','P#002','P#003','P#004','P#005','P#006']}
-            datasets={[{ label: 'COP (M)', data: [45,12.5,28,18,8,4.5] }]}
-            className="h-56"
-          />
-          <div className="mt-4 pt-4 border-t border-dark-600/50 space-y-2">
-            {[
-              { l: 'Proyectos facturados', v: '8', c: 'text-neon-green' },
-              { l: 'Facturas pendientes', v: '3', c: 'text-neon-yellow' },
-              { l: 'Cartera vencida', v: formatCurrency(4200000), c: 'text-red-400' },
-            ].map(x => (
-              <div key={x.l} className="flex items-center justify-between text-sm">
-                <span className="text-dark-400">{x.l}</span>
-                <span className={cn('font-bold', x.c)}>{x.v}</span>
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
 
       {showModal && (
