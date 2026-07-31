@@ -18,7 +18,7 @@ class Settings(BaseSettings):
 
     def get_db_url(self):
         """Vercel Postgres expone POSTGRES_URL. Si existe, preferirla sobre SQLite."""
-        for env in ["POSTGRES_URL", "POSTGRES_PRISMA_URL", "DATABASE_URL"]:
+        for env in ["POSTGRES_URL", "POSTGRES_PRISMA_URL", "SUPABASE_URL", "DATABASE_URL"]:
             val = os.environ.get(env)
             if val and "postgres" in val.lower():
                 if val.startswith("postgres://"):
