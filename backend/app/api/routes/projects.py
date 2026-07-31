@@ -88,7 +88,13 @@ def get_project(project_id: int, db: Session = Depends(get_db), current_user: Us
     p = q.first()
     if not p:
         raise HTTPException(404, "Project not found")
-    return p
+    
+    # Filter tasks strictly by user if not admin
+    p_dict = ProjectSchema.model_validate(p).model_dump()
+    if not is_admin(current_user):
+        p_dict["tasks"] = [t for t in p_dict.get("tasks", []) if t.get("assigned_to_id") == current_user.id]
+        
+    return p_dict
 
 
 @router.put("/projects/{project_id}", response_model=ProjectSchema)
