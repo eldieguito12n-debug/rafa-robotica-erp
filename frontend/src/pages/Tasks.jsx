@@ -142,7 +142,8 @@ export default function Tasks() {
     ...t, 
     project_name: t.project?.name || `Proyecto #${t.project_id}`, 
     assigned_to_name: t.assigned_to?.full_name || (t.assigned_to_id ? `Usuario #${t.assigned_to_id}` : 'Sin asignar'),
-  })).filter(t =>
+  })).filter(t => admin || t.assigned_to_id === user?.id)
+  .filter(t =>
     (!search || t.title.toLowerCase().includes(search.toLowerCase()) || (t.project_name || '').toLowerCase().includes(search.toLowerCase())) &&
     (!status || t.status === status) &&
     (!priority || t.priority === priority)
@@ -219,7 +220,7 @@ export default function Tasks() {
               </thead>
               <tbody>
                 {loading && <tr><td colSpan={8} className="py-10 text-center"><span className="w-6 h-6 inline-block border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" /></td></tr>}
-                {!loading && list.length === 0 && <tr><td colSpan={8} className="py-10 text-center text-dark-500">Sin resultados</td></tr>}
+                {!loading && list.length === 0 && <tr><td colSpan={8} className="py-10 text-center text-dark-500">{admin ? 'Sin resultados' : 'No tienes tareas asignadas'}</td></tr>}
                 {list.map((t, i) => {
                   const overdue = t.due_date && t.status !== 'finalizado' && new Date(t.due_date) < new Date();
                   return (
