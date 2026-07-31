@@ -26,10 +26,15 @@ class Settings(BaseSettings):
                 elif val.startswith("postgresql://") and "+psycopg2" not in val:
                     val = val.replace("postgresql://", "postgresql+psycopg2://", 1)
                 
-                # Psycopg2 does not support "supa=" or "pgbouncer=" connection options.
+                # Psycopg2 no soporta "supa=" o "pgbouncer=", pero sí necesita "sslmode="
                 if "?" in val:
-                    val = val.split("?")[0]
-                
+                    base, query = val.split("?", 1)
+                    params = query.split("&")
+                    valid_params = [p for p in params if not p.startswith("supa=") and not p.startswith("pgbouncer=")]
+                    if valid_params:
+                        val = base + "?" + "&".join(valid_params)
+                    else:
+                        val = base
                 return val
         db_url = self.DATABASE_URL
         if os.environ.get("VERCEL") and db_url.startswith("sqlite") and "/tmp/" not in db_url:
