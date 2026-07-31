@@ -190,6 +190,7 @@ export default function Financial() {
               </tbody>
             </table>
           </div>
+        </div>
       </div>
 
       {showModal && (
