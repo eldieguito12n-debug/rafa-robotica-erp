@@ -10,6 +10,14 @@ from .models import *
 
 Base.metadata.create_all(bind=engine)
 
+app = FastAPI(
+    title="RoboLab ERP API",
+    description="Sistema Inteligente para Laboratorio de Robótica e Innovación Tecnológica",
+    version="1.0.0",
+    docs_url="/docs",
+    redoc_url="/redoc",
+)
+
 @app.on_event("startup")
 def run_migrations():
     from .core.database import SessionLocal
@@ -30,14 +38,6 @@ def run_migrations():
                 db.rollback()
     finally:
         db.close()
-
-app = FastAPI(
-    title="RoboLab ERP API",
-    description="Sistema Inteligente para Laboratorio de Robótica e Innovación Tecnológica",
-    version="1.0.0",
-    docs_url="/docs",
-    redoc_url="/redoc",
-)
 
 @app.get("/api/v1/migrate_db")
 def migrate_db(db: Session = Depends(get_db)):
