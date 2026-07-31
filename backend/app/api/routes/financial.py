@@ -58,6 +58,21 @@ def create_financial_record(
     return r
 
 
+@router.delete("/financial/{record_id}")
+def delete_financial_record(
+    record_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    r = db.query(FinancialRecord).filter(FinancialRecord.id == record_id).first()
+    if not r:
+        raise HTTPException(404, "Financial record not found")
+    log_activity(db, current_user.id, "eliminar", "financial_record", r.id, {"description": r.description, "amount": r.amount})
+    db.delete(r)
+    db.commit()
+    return {"message": "Financial record deleted"}
+
+
 @router.get("/financial/summary")
 def get_financial_summary(
     date_from: Optional[date] = None,

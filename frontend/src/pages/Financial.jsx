@@ -1,8 +1,8 @@
 import { useEffect, useState, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import {
-  FaCalculator, FaPlus, FaFileInvoiceDollar, FaArrowUp, FaArrowDown,
-  FaChartPie, FaDollarSign, FaFileAlt, FaDownload, FaSearch, FaFilter,
+  FaDollarSign, FaArrowUp, FaArrowDown, FaChartPie, FaPlus, FaSearch,
+  FaFilter, FaFileAlt, FaDownload, FaFileInvoiceDollar, FaTrash, FaCalculator
 } from 'react-icons/fa';
 import { financialAPI } from '../lib/api';
 import { cn, formatCurrency, formatDate, getStatusBadge } from '../lib/utils';
@@ -65,6 +65,17 @@ export default function Financial() {
       addToast(err?.response?.data?.detail || 'Error guardando movimiento', 'error');
     } finally {
       setSaving(false);
+    }
+  };
+
+  const handleDelete = async (id) => {
+    if (!confirm('¿Estás seguro de que deseas eliminar este movimiento financiero? Esta acción no se puede deshacer.')) return;
+    try {
+      await financialAPI.removeRecord(id);
+      addToast('Movimiento eliminado', 'success');
+      load();
+    } catch (err) {
+      addToast(err.response?.data?.detail || 'Error al eliminar', 'error');
     }
   };
 
@@ -149,6 +160,7 @@ export default function Financial() {
                   <th className="text-left py-3 px-4 hidden md:table-cell">Tipo</th>
                   <th className="text-left py-3 px-4 hidden lg:table-cell">Categoría</th>
                   <th className="text-right py-3 px-4">Monto</th>
+                  <th className="text-right py-3 px-4"></th>
                 </tr>
               </thead>
               <tbody>
@@ -167,6 +179,11 @@ export default function Financial() {
                       <td className="py-3 px-4 text-xs text-dark-400 hidden lg:table-cell">{r.category}</td>
                       <td className={`py-3 px-4 text-right font-mono font-bold ${ing ? 'text-neon-green' : 'text-red-400'}`}>
                         {ing ? '+' : '-'}{formatCurrency(r.amount)}
+                      </td>
+                      <td className="py-3 px-4 text-right">
+                        <button onClick={() => handleDelete(r.id)} className="w-7 h-7 rounded-lg hover:bg-red-500/15 text-red-400 inline-flex items-center justify-center transition" title="Eliminar">
+                          <FaTrash size={11} />
+                        </button>
                       </td>
                     </tr>
                   );
