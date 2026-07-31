@@ -18,7 +18,6 @@ import Inventory from './pages/Inventory.jsx';
 import Financial from './pages/Financial.jsx';
 import Clients from './pages/Clients.jsx';
 import Quotes from './pages/Quotes.jsx';
-import Invoices from './pages/Invoices.jsx';
 import Calendar from './pages/Calendar.jsx';
 import Chat from './pages/Chat.jsx';
 import Reports from './pages/Reports.jsx';
@@ -99,7 +98,6 @@ export default function App() {
             <Route path="/financial" element={<RequireAuth adminOnly><Financial /></RequireAuth>} />
             <Route path="/clients"   element={<RequireAuth adminOnly><Clients /></RequireAuth>} />
             <Route path="/quotes"    element={<RequireAuth adminOnly><Quotes /></RequireAuth>} />
-            <Route path="/invoices"  element={<RequireAuth adminOnly><Invoices /></RequireAuth>} />
             <Route path="/reports"   element={<RequireAuth adminOnly><Reports /></RequireAuth>} />
             <Route path="/settings"  element={<RequireAuth adminOnly><Settings /></RequireAuth>} />
 

@@ -19,7 +19,6 @@ const labels = {
   '/labs': { label: 'Laboratorios', desc: 'Estado de los espacios de trabajo' },
   '/financial': { label: 'Finanzas', desc: 'Ingresos, egresos y utilidad' },
   '/quotes': { label: 'Cotizaciones', desc: 'Cotizaciones y propuestas comerciales' },
-  '/invoices': { label: 'Facturas', desc: 'Facturación y cobros' },
   '/calendar': { label: 'Calendario', desc: 'Cronograma de eventos y entregas' },
   '/chat': { label: 'Chat Interno', desc: 'Comunicación en tiempo real' },
   '/reports': { label: 'Reportes', desc: 'Informes y análisis de datos' },

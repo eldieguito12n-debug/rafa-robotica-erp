@@ -30,7 +30,6 @@ const menu = [
   ]},
   { group: 'Negocios', items: [
     { to: '/quotes', label: 'Cotizaciones', icon: FaQuoteLeft, adminOnly: true },
-    { to: '/invoices', label: 'Facturas', icon: FaFileInvoiceDollar, adminOnly: true },
     { to: '/financial', label: 'Finanzas', icon: FaCalculator, adminOnly: true },
   ]},
   { group: 'Analítica', items: [
