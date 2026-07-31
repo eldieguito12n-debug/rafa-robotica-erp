@@ -46,7 +46,10 @@ def create_inventory_item(
     current_user: User = Depends(require_admin),
 ):
     """Solo Administrador / Jefe de Desarrollo pueden crear productos en el inventario."""
-    item = InventoryItem(**data.model_dump())
+    item_data = data.model_dump()
+    if item_data.get('sku') == "":
+        item_data['sku'] = None
+    item = InventoryItem(**item_data)
     item.low_stock_alert = item.quantity <= item.min_stock
     db.add(item)
     db.flush()
@@ -96,6 +99,8 @@ def update_inventory_item(
     if not item:
         raise HTTPException(404, "Artículo no encontrado")
     for k, v in data.model_dump(exclude_unset=True).items():
+        if k == 'sku' and v == "":
+            v = None
         setattr(item, k, v)
     item.low_stock_alert = item.quantity <= item.min_stock
     db.flush()
