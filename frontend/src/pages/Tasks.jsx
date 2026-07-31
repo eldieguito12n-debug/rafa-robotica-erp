@@ -220,7 +220,7 @@ export default function Tasks() {
               </thead>
               <tbody>
                 {loading && <tr><td colSpan={8} className="py-10 text-center"><span className="w-6 h-6 inline-block border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" /></td></tr>}
-                {!loading && list.length === 0 && <tr><td colSpan={8} className="py-10 text-center text-dark-500">{admin ? 'Sin resultados' : 'No tienes tareas asignadas'}</td></tr>}
+                {!loading && list.length === 0 && <tr><td colSpan={8} className="py-10 text-center text-dark-500">{admin ? 'Sin resultados' : `No tienes tareas asignadas (API=${tasks.length} | UID=${user?.id})`}</td></tr>}
                 {list.map((t, i) => {
                   const overdue = t.due_date && t.status !== 'finalizado' && new Date(t.due_date) < new Date();
                   return (
