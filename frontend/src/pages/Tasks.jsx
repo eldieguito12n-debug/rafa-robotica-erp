@@ -142,7 +142,7 @@ export default function Tasks() {
     ...t, 
     project_name: t.project?.name || `Proyecto #${t.project_id}`, 
     assigned_to_name: t.assigned_to?.full_name || (t.assigned_to_id ? `Usuario #${t.assigned_to_id}` : 'Sin asignar'),
-  })).filter(t => admin || t.assigned_to_id === user?.id)
+  }))
   .filter(t =>
     (!search || t.title.toLowerCase().includes(search.toLowerCase()) || (t.project_name || '').toLowerCase().includes(search.toLowerCase())) &&
     (!status || t.status === status) &&
