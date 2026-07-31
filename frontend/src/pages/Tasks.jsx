@@ -220,7 +220,7 @@ export default function Tasks() {
               </thead>
               <tbody>
                 {loading && <tr><td colSpan={8} className="py-10 text-center"><span className="w-6 h-6 inline-block border-2 border-primary-500/30 border-t-primary-500 rounded-full animate-spin" /></td></tr>}
-                {!loading && list.length === 0 && <tr><td colSpan={8} className="py-10 text-center text-dark-500">{admin ? 'Sin resultados' : `No tienes tareas asignadas (API=${tasks.length} | UID=${user?.id})`}</td></tr>}
+                {!loading && list.length === 0 && <tr><td colSpan={8} className="py-10 text-center text-dark-500">{admin ? 'Sin resultados' : 'No hay tareas registradas'}</td></tr>}
                 {list.map((t, i) => {
                   const overdue = t.due_date && t.status !== 'finalizado' && new Date(t.due_date) < new Date();
                   return (
@@ -276,9 +276,6 @@ export default function Tasks() {
                             <button className="w-7 h-7 rounded-lg hover:bg-primary-500/15 text-primary-400 flex items-center justify-center" title="Editar"><FaEdit size={11} /></button>
                             <button onClick={(e) => { e.preventDefault(); handleDelete(t); }} className="w-7 h-7 rounded-lg hover:bg-red-500/15 text-red-400 flex items-center justify-center" title="Eliminar"><FaTrash size={11} /></button>
                           </RoleGuard>
-                          {!admin && t.assigned_to_id === user?.id && (
-                            <button className="w-7 h-7 rounded-lg hover:bg-primary-500/15 text-primary-400 flex items-center justify-center" title="Ver / Actualizar progreso"><FaEdit size={11} /></button>
-                          )}
                         </div>
                       </td>
                     </motion.tr>

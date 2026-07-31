@@ -89,12 +89,7 @@ def get_project(project_id: int, db: Session = Depends(get_db), current_user: Us
     if not p:
         raise HTTPException(404, "Project not found")
     
-    # Filter tasks strictly by user if not admin
-    p_dict = ProjectSchema.model_validate(p).model_dump()
-    if not is_admin(current_user):
-        p_dict["tasks"] = [t for t in p_dict.get("tasks", []) if t.get("assigned_to_id") == current_user.id]
-        
-    return p_dict
+    return ProjectSchema.model_validate(p).model_dump()
 
 
 @router.put("/projects/{project_id}", response_model=ProjectSchema)
@@ -190,10 +185,6 @@ def list_tasks(
     current_user: User = Depends(get_current_user),
 ):
     q = db.query(Task)
-    
-    # Filter logic: if not admin, only show assigned tasks
-    if not is_admin(current_user):
-        q = q.filter(Task.assigned_to_id == current_user.id)
 
     if status:
         q = q.filter(Task.status == status)
@@ -226,8 +217,6 @@ def create_task(
 @router.get("/tasks/{task_id}", response_model=TaskSchema)
 def get_task(task_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     q = db.query(Task).filter(Task.id == task_id)
-    if not is_admin(current_user):
-        q = q.filter(Task.assigned_to_id == current_user.id)
     t = q.first()
     if not t:
         raise HTTPException(404, "Task not found")
