@@ -10,6 +10,27 @@ from .models import *
 
 Base.metadata.create_all(bind=engine)
 
+@app.on_event("startup")
+def run_migrations():
+    from .core.database import SessionLocal
+    from sqlalchemy import text
+    db = SessionLocal()
+    try:
+        queries = [
+            "ALTER TABLE tasks ADD COLUMN approved_by_id INTEGER REFERENCES users(id)",
+            "ALTER TABLE tasks ADD COLUMN completed_at TIMESTAMP WITH TIME ZONE",
+            "ALTER TABLE tasks ADD COLUMN total_time_spent FLOAT DEFAULT 0.0",
+            "ALTER TABLE tasks ADD COLUMN history JSON DEFAULT '[]'"
+        ]
+        for q in queries:
+            try:
+                db.execute(text(q))
+                db.commit()
+            except Exception as e:
+                db.rollback()
+    finally:
+        db.close()
+
 app = FastAPI(
     title="RoboLab ERP API",
     description="Sistema Inteligente para Laboratorio de Robótica e Innovación Tecnológica",
