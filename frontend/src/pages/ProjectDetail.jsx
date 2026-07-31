@@ -7,7 +7,7 @@ import {
 } from 'react-icons/fa';
 import { cn, formatCurrency, formatDate, getStatusBadge } from '../lib/utils';
 import Avatar from '../components/ui/Avatar.jsx';
-import RoleGuard from '../components/RoleGuard.jsx';
+import RoleGuard from '../components/ui/RoleGuard.jsx';
 import { useAuth } from '../context/AuthContext.jsx';
 import { BarChart, LineChart } from '../components/ui/Charts.jsx';
 
