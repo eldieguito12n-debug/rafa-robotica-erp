@@ -47,7 +47,12 @@ def list_projects(
 
 
     if status:
-        q = q.filter(Project.status == status)
+        from ...models import ProjectStatus
+        try:
+            enum_status = ProjectStatus(status)
+            q = q.filter(Project.status == enum_status)
+        except ValueError:
+            pass
     if client_id:
         q = q.filter(Project.client_id == client_id)
     if search:
@@ -178,13 +183,23 @@ def list_tasks(
     q = db.query(Task)
 
     if status:
-        q = q.filter(Task.status == status)
+        from ...models import TaskStatus
+        try:
+            enum_status = TaskStatus(status)
+            q = q.filter(Task.status == enum_status)
+        except ValueError:
+            pass
     if project_id:
         q = q.filter(Task.project_id == project_id)
     if assigned_to_id:
         q = q.filter(Task.assigned_to_id == assigned_to_id)
     if priority:
-        q = q.filter(Task.priority == priority)
+        from ...models import TaskPriority
+        try:
+            enum_priority = TaskPriority(priority)
+            q = q.filter(Task.priority == enum_priority)
+        except ValueError:
+            pass
     return q.order_by(Task.created_at.desc()).offset(skip).limit(limit).all()
 
 

@@ -18,11 +18,12 @@ def get_dashboard_stats(
     today = date.today()
     first_day_month = today.replace(day=1)
 
-    active_projects = db.query(Project).filter(Project.status.in_(["en_progreso", "pendiente", "en_pruebas"])).count()
-    completed_projects = db.query(Project).filter(Project.status == "finalizado").count()
+    from ...models import ProjectStatus, TaskStatus
+    active_projects = db.query(Project).filter(Project.status.in_([ProjectStatus.EN_PROGRESO, ProjectStatus.PENDIENTE, ProjectStatus.EN_PRUEBAS])).count()
+    completed_projects = db.query(Project).filter(Project.status == ProjectStatus.FINALIZADO).count()
     connected_developers = db.query(Developer).filter(Developer.status == "activo").count()
     
-    tasks_query = db.query(Task).filter(Task.status.in_(["pendiente", "en_proceso"]))
+    tasks_query = db.query(Task).filter(Task.status.in_([TaskStatus.PENDIENTE, TaskStatus.EN_PROCESO]))
     pending_tasks = tasks_query.count()
 
     hours_worked = 0.0
