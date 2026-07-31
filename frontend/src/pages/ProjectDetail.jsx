@@ -7,10 +7,13 @@ import {
 } from 'react-icons/fa';
 import { cn, formatCurrency, formatDate, getStatusBadge } from '../lib/utils';
 import Avatar from '../components/ui/Avatar.jsx';
+import RoleGuard from '../components/RoleGuard.jsx';
+import { useAuth } from '../context/AuthContext.jsx';
 import { BarChart, LineChart } from '../components/ui/Charts.jsx';
 
 export default function ProjectDetail() {
   const { id } = useParams();
+  const { isAdmin } = useAuth();
   const [tab, setTab] = useState('general');
 
   const project = {
@@ -50,7 +53,7 @@ export default function ProjectDetail() {
           <h2 className="text-2xl font-black heading-glow truncate">{project.name}</h2>
         </div>
         <div className="ml-auto flex items-center gap-2">
-          <button className="btn-secondary !px-3 !py-2 !text-sm"><FaEdit size={12} /> Editar</button>
+          {isAdmin() && <button className="btn-secondary !px-3 !py-2 !text-sm"><FaEdit size={12} /> Editar</button>}
           <button className="btn-primary !px-3 !py-2 !text-sm"><FaDownload size={12} /> Reporte</button>
         </div>
       </motion.div>
@@ -186,9 +189,11 @@ export default function ProjectDetail() {
                   </div>
                 </motion.div>
               ))}
-              <button className="glass rounded-xl p-4 hover:border-neon-green/40 text-dark-500 hover:text-neon-green transition flex items-center justify-center gap-2 border-dashed border-2">
-                <FaPlus size={14} /> Agregar integrante
-              </button>
+              <RoleGuard adminOnly>
+                <button className="glass rounded-xl p-4 hover:border-neon-green/40 text-dark-500 hover:text-neon-green transition flex items-center justify-center gap-2 border-dashed border-2">
+                  <FaPlus size={14} /> Agregar integrante
+                </button>
+              </RoleGuard>
             </div>
           )}
 
@@ -222,9 +227,11 @@ export default function ProjectDetail() {
                   </div>
                 </motion.div>
               ))}
-              <button className="glass rounded-xl p-4 hover:border-neon-green/40 text-dark-500 hover:text-neon-green transition flex flex-col items-center justify-center gap-2 border-dashed border-2 min-h-[140px]">
-                <FaPlus size={20} /> Subir archivo
-              </button>
+              <RoleGuard adminOnly>
+                <button className="glass rounded-xl p-4 hover:border-neon-green/40 text-dark-500 hover:text-neon-green transition flex flex-col items-center justify-center gap-2 border-dashed border-2 min-h-[140px]">
+                  <FaPlus size={20} /> Subir archivo
+                </button>
+              </RoleGuard>
             </div>
           )}
 

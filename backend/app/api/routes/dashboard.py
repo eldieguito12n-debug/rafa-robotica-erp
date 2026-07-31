@@ -23,8 +23,6 @@ def get_dashboard_stats(
     connected_developers = db.query(Developer).filter(Developer.status == "activo").count()
     
     tasks_query = db.query(Task).filter(Task.status.in_(["pendiente", "en_proceso"]))
-    if not is_admin(current_user):
-        tasks_query = tasks_query.filter(Task.assigned_to_id == current_user.id)
     pending_tasks = tasks_query.count()
 
     hours_worked = 0.0

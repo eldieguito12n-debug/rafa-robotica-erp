@@ -44,12 +44,7 @@ def list_projects(
 ):
     q = db.query(Project)
     
-    # Filter logic: if not admin, only show projects assigned to the user
-    if not is_admin(current_user):
-        if current_user.developer:
-            q = q.join(ProjectDeveloper).filter(ProjectDeveloper.developer_id == current_user.developer.id)
-        else:
-            q = q.filter(Project.id == 0) # empty
+
 
     if status:
         q = q.filter(Project.status == status)
@@ -80,11 +75,7 @@ def create_project(
 @router.get("/projects/{project_id}", response_model=ProjectSchema)
 def get_project(project_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
     q = db.query(Project).filter(Project.id == project_id)
-    if not is_admin(current_user):
-        if current_user.developer:
-            q = q.join(ProjectDeveloper).filter(ProjectDeveloper.developer_id == current_user.developer.id)
-        else:
-            q = q.filter(Project.id == 0)
+
     p = q.first()
     if not p:
         raise HTTPException(404, "Project not found")
