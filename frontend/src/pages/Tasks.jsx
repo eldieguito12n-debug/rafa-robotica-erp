@@ -72,8 +72,8 @@ export default function Tasks() {
           priority: priority || undefined,
           limit: 100,
         }),
-        projectsAPI.list({ limit: 100 }),
-        usersAPI.list({ limit: 1000 })
+        projectsAPI.list({ limit: 100 }).catch(() => ({ data: [] })),
+        usersAPI.list({ limit: 1000 }).catch(() => ({ data: [] }))
       ]);
       setTasks(resTasks.data);
       setProjects(resProj.data);
