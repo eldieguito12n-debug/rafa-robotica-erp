@@ -112,7 +112,7 @@ def _build_company_header(styles, width=7.0 * inch):
     if logo_flowable:
         left_tbl = Table([[
             logo_flowable, 
-            [Paragraph(empresa["nombre"], styles["CompanyName"]), Paragraph(empresa["slogan"], styles["CompanyDetail"])]
+            [Paragraph(empresa["nombre"], styles["CompanyName"]), Spacer(1, 10), Paragraph(empresa["slogan"], styles["CompanyDetail"])]
         ]], colWidths=[1.2*inch, 2.9*inch])
         left_tbl.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -121,6 +121,7 @@ def _build_company_header(styles, width=7.0 * inch):
         header_left.append(left_tbl)
     else:
         header_left.append(Paragraph(empresa["nombre"], styles["CompanyName"]))
+        header_left.append(Spacer(1, 10))
         header_left.append(Paragraph(empresa["slogan"], styles["CompanyDetail"]))
         
     data = [
@@ -384,7 +385,7 @@ def generate_quote_pdf_bytes(db: Session, quote_id: int) -> bytes:
         ["IVA:", f"${float(quote.tax or 0):,.2f}"],
         ["Total a Pagar:", f"${float(quote.total or 0):,.2f}"]
     ]
-    tot_tbl = Table(tot_data, colWidths=[1.5*inch, 1.5*inch])
+    tot_tbl = Table(tot_data, colWidths=[2.0*inch, 1.8*inch])
     tot_tbl.setStyle(TableStyle([
         ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
         ("FONTSIZE", (0, 0), (-1, -1), 10),
@@ -397,7 +398,7 @@ def generate_quote_pdf_bytes(db: Session, quote_id: int) -> bytes:
         ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
     ]))
     
-    bottom_tbl = Table([[notes_para, tot_tbl]], colWidths=[4.0*inch, 3.0*inch])
+    bottom_tbl = Table([[notes_para, tot_tbl]], colWidths=[3.2*inch, 3.8*inch])
     bottom_tbl.setStyle(TableStyle([
         ("VALIGN", (0, 0), (-1, -1), "TOP"),
         ("ALIGN", (1, 0), (1, -1), "RIGHT"),
