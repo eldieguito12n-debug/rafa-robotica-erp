@@ -5,7 +5,7 @@ import { FaWhatsapp, FaTrash, FaQuoteLeft, FaSearch, FaPlus, FaFilePdf, FaFileEx
 import api, { financialAPI, clientsAPI } from '../lib/api';
 import { useAppData } from '../context/AppDataContext';
 
-const statusOptions = ['borrador', 'pendiente', 'enviada', 'aprobada', 'rechazada', 'vencida'];
+const statusOptions = ['borrador', 'enviada', 'aprobada', 'rechazada', 'vencida'];
 
 const emptyForm = {
   client_id: '',

@@ -88,7 +88,6 @@ class InvoiceStatus(str, enum.Enum):
 
 class QuoteStatus(str, enum.Enum):
     BORRADOR = "borrador"
-    PENDIENTE = "pendiente"
     ENVIADA = "enviada"
     APROBADA = "aprobada"
     RECHAZADA = "rechazada"
