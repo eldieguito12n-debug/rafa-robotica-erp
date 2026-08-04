@@ -96,6 +96,29 @@ def root():
     }
 
 
+from fastapi import HTTPException
+from fastapi.responses import StreamingResponse
+from io import BytesIO
+
+@app.get("/public/quotes/{quote_id}/pdf", tags=["Public"])
+def public_download_quote_pdf(quote_id: int, db: Session = Depends(get_db)):
+    from .core.pdf import generate_quote_pdf_bytes
+    q = db.query(Quote).filter(Quote.id == quote_id).first()
+    if not q:
+        raise HTTPException(404, "Quote not found")
+    try:
+        pdf_bytes = generate_quote_pdf_bytes(db, quote_id)
+    except Exception as e:
+        raise HTTPException(500, f"Error generating PDF: {str(e)}")
+        
+    filename = f"Cotizacion_{quote_id}.pdf"
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"},
+    )
+
+
 from sqlalchemy import text
 
 @app.get("/api/v1/health")

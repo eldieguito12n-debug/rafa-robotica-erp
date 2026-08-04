@@ -444,7 +444,7 @@ def generate_quote_pdf_bytes(db: Session, quote_id: int) -> bytes:
     
     # QR Code
     try:
-        url = f"https://rafarobotica.com/quotes/{quote.id}"
+        url = f"https://backend-six-omega-27.vercel.app/public/quotes/{quote.id}/pdf"
         qr_code = qr.QrCodeWidget(url)
         bounds = qr_code.getBounds()
         w, h = bounds[2] - bounds[0], bounds[3] - bounds[1]
