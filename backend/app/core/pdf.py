@@ -104,8 +104,7 @@ def _build_company_header(styles, width=7.0 * inch):
     logo_flowable = None
     if os.path.exists(logo_path):
         try:
-            # Aspect ratio 220x60
-            logo_flowable = Image(logo_path, width=2.5*inch, height=0.7*inch)
+            logo_flowable = Image(logo_path, width=3.5*inch, height=1.2*inch, kind='proportional')
             logo_flowable.hAlign = 'LEFT'
         except Exception:
             pass
@@ -435,7 +434,21 @@ def generate_quote_pdf_bytes(db: Session, quote_id: int) -> bytes:
     except Exception:
         pass
 
-    doc.build(story)
+    def add_watermark(c, doc):
+        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "logo_cropped.jpg")
+        if os.path.exists(logo_path):
+            c.saveState()
+            c.translate(4.25*inch, 5.5*inch)
+            c.rotate(45)
+            c.setFillAlpha(0.15)
+            try:
+                # Use absolute path and draw image
+                c.drawImage(logo_path, -2.5*inch, -1.0*inch, width=5.0*inch, height=2.0*inch, preserveAspectRatio=True, mask='auto')
+            except Exception:
+                pass
+            c.restoreState()
+
+    doc.build(story, onFirstPage=add_watermark, onLaterPages=add_watermark)
     return buffer.getvalue()
 
 
