@@ -8,12 +8,12 @@ import { useAppData } from '../context/AppDataContext';
 
 const emptyForm = {
   company_name: '',
-  contact_person: '',
-  email: '',
-  phone: '',
+  contact_name: '',
+  contact_phone: '',
   address: '',
-  tax_id: '',
-  status: 'activo',
+  nit: '',
+  credit_limit: 0,
+  notes: '',
 };
 
 export default function Clients() {
@@ -49,12 +49,12 @@ export default function Clients() {
     setEditing(c.id);
     setForm({
       company_name: c.company_name || '',
-      contact_person: c.contact_person || c.contact_name || c.user?.full_name || '',
-      email: c.email || c.user?.email || '',
-      phone: c.phone || c.contact_phone || '',
+      contact_name: c.contact_name || c.user?.full_name || '',
+      contact_phone: c.contact_phone || '',
       address: c.address || '',
-      tax_id: c.tax_id || c.nit || '',
-      status: c.status || (c.current_balance >= 0 ? 'activo' : 'inactivo'),
+      nit: c.nit || '',
+      credit_limit: c.credit_limit || 0,
+      notes: c.notes || '',
     });
     setShowModal(true);
   };
@@ -214,21 +214,21 @@ export default function Clients() {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Persona de Contacto</label>
-                  <input value={form.contact_person} onChange={e => setForm({ ...form, contact_person: e.target.value })} className="input-field" placeholder="Nombre contacto" />
+                  <input value={form.contact_name} onChange={e => setForm({ ...form, contact_name: e.target.value })} className="input-field" placeholder="Nombre contacto" />
                 </div>
                 <div>
                   <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">NIT / Identificación</label>
-                  <input value={form.tax_id} onChange={e => setForm({ ...form, tax_id: e.target.value })} className="input-field" placeholder="NIT, cédula..." />
+                  <input value={form.nit} onChange={e => setForm({ ...form, nit: e.target.value })} className="input-field" placeholder="NIT, cédula..." />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Email</label>
-                  <input type="email" value={form.email} onChange={e => setForm({ ...form, email: e.target.value })} className="input-field" placeholder="cliente@email.com" />
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Teléfono de Contacto</label>
+                  <input value={form.contact_phone} onChange={e => setForm({ ...form, contact_phone: e.target.value })} className="input-field" placeholder="+57 ..." />
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Teléfono</label>
-                  <input value={form.phone} onChange={e => setForm({ ...form, phone: e.target.value })} className="input-field" placeholder="+57 ..." />
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Cupo de Crédito</label>
+                  <input type="number" min="0" step="1000" value={form.credit_limit} onChange={e => setForm({ ...form, credit_limit: Number(e.target.value) })} className="input-field" placeholder="0.00" />
                 </div>
               </div>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -236,12 +236,9 @@ export default function Clients() {
                   <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Dirección</label>
                   <input value={form.address} onChange={e => setForm({ ...form, address: e.target.value })} className="input-field" placeholder="Dirección completa" />
                 </div>
-                <div>
-                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Estado</label>
-                  <select value={form.status} onChange={e => setForm({ ...form, status: e.target.value })} className="input-field">
-                    <option value="activo">Activo</option>
-                    <option value="inactivo">Inactivo</option>
-                  </select>
+                <div className="md:col-span-2">
+                  <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Notas Adicionales</label>
+                  <textarea rows="2" value={form.notes} onChange={e => setForm({ ...form, notes: e.target.value })} className="input-field resize-none" placeholder="Observaciones, acuerdos, etc..." />
                 </div>
               </div>
               <div className="flex gap-2 pt-3 border-t border-dark-600/40 justify-end">

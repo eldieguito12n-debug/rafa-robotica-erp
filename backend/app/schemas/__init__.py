@@ -81,7 +81,7 @@ class ClientBase(BaseModel):
 
 
 class ClientCreate(ClientBase):
-    user_id: int
+    user_id: Optional[int] = None
 
 
 class ClientUpdate(BaseModel):
@@ -97,7 +97,7 @@ class ClientUpdate(BaseModel):
 
 class Client(ClientBase):
     id: int
-    user_id: int
+    user_id: Optional[int] = None
     current_balance: float = 0.0
     created_at: Optional[datetime] = None
 

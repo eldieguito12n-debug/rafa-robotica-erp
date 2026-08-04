@@ -29,6 +29,7 @@ const menu = [
     { to: '/chat', label: 'Chat Global', icon: FaComments, roles: null },
   ]},
   { group: 'Negocios', items: [
+    { to: '/clients', label: 'Clientes', icon: FaUserFriends, adminOnly: true },
     { to: '/quotes', label: 'Cotizaciones', icon: FaQuoteLeft, adminOnly: true },
     { to: '/financial', label: 'Finanzas', icon: FaCalculator, adminOnly: true },
   ]},
