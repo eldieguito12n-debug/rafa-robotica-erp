@@ -18,7 +18,7 @@ from ..models import Invoice, Quote, Client, Project
 
 
 EMPRESA_DUMMY = {
-    "nombre": "Rafa Robótica S.A.S.",
+    "nombre": "RAFA ROBOTICA",
     "nit": "NIT 1040361448",
     "direccion": "Parque Industrial, Bodega 4, Bogotá D.C.",
     "telefono": "+57 3114385093",
@@ -303,7 +303,7 @@ def generate_invoice_pdf_bytes(db: Session, invoice_id: int) -> bytes:
 
     story.append(Spacer(1, 10))
     story.append(Paragraph(
-        f"RoboLab S.A.S. - Documento generado automáticamente. Gracias por su preferencia.",
+        f"RAFA ROBOTICA - Documento generado automáticamente. Gracias por su preferencia.",
         styles["FooterText"]
     ))
 
@@ -430,7 +430,7 @@ def generate_quote_pdf_bytes(db: Session, quote_id: int) -> bytes:
         [HRFlowable(width="80%", thickness=0.5, color=colors.HexColor("#aaaaaa")),
          HRFlowable(width="80%", thickness=0.5, color=colors.HexColor("#aaaaaa"))],
         [Paragraph(f"Firma Cliente<br/>{client.nit if client else ''}", styles["FooterText"]),
-         Paragraph("Firma Responsable<br/>Rafa Robótica S.A.S.", styles["FooterText"])]
+         Paragraph("Firma Responsable<br/>RAFA ROBOTICA", styles["FooterText"])]
     ]
     sig_tbl = Table(sig_data, colWidths=[3.5 * inch, 3.5 * inch])
     sig_tbl.setStyle(TableStyle([
