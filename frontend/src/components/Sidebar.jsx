@@ -64,8 +64,8 @@ export default function Sidebar() {
       >
         <div className="h-full glass border-r border-dark-600/60 flex flex-col w-[270px] max-w-full">
           <div className="p-5 flex items-center gap-3 border-b border-dark-600/50">
-            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary-600 via-primary-500 to-neon-green flex items-center justify-center shadow-glow-blue flex-shrink-0 animate-glow">
-              <FaRobot size={22} className="text-white" />
+            <div className="w-11 h-11 rounded-xl bg-gradient-to-br from-primary-600 via-primary-500 to-neon-green flex items-center justify-center shadow-glow-blue flex-shrink-0 animate-glow overflow-hidden p-0.5">
+              <img src="/logo.png" alt="Logo" className="w-full h-full object-cover rounded-[10px]" />
             </div>
             <div className="flex-1 min-w-0">
               <div className="font-black text-lg leading-tight heading-glow truncate">RAFA ROBOTICA</div>
