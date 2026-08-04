@@ -352,7 +352,7 @@ class QuoteBase(BaseModel):
 
 
 class QuoteCreate(QuoteBase):
-    quote_number: str
+    quote_number: Optional[str] = None
     client_id: Optional[int] = None
     project_id: Optional[int] = None
 

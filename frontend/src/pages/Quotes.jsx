@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react';
 import { motion } from 'framer-motion';
-import { FaQuoteLeft, FaSearch, FaPlus, FaFilePdf, FaQrcode, FaFileExport, FaCheck, FaTimes, FaCalendarAlt, FaDollarSign, FaUserFriends, FaPrint, FaEye } from 'react-icons/fa';
 import { cn, formatCurrency, formatDate, getStatusBadge } from '../lib/utils';
-import { financialAPI, clientsAPI } from '../lib/api';
+import { FaWhatsapp, FaTrash, FaQuoteLeft, FaSearch, FaPlus, FaFilePdf, FaFileExport, FaCheck, FaTimes, FaCalendarAlt, FaDollarSign, FaUserFriends, FaPrint, FaEye } from 'react-icons/fa';
+import api, { financialAPI, clientsAPI } from '../lib/api';
 import { useAppData } from '../context/AppDataContext';
 
 const statusOptions = ['borrador', 'pendiente', 'enviada', 'aprobada', 'rechazada', 'vencida'];
@@ -17,6 +17,7 @@ const emptyForm = {
   total_amount: '',
   notes: '',
   status: 'borrador',
+  items: [],
 };
 
 export default function Quotes() {
@@ -82,15 +83,75 @@ export default function Quotes() {
       if (payload.tax !== '') payload.tax = Number(payload.tax);
       if (payload.discount !== '') payload.discount = Number(payload.discount);
       if (payload.total_amount !== '') payload.total_amount = Number(payload.total_amount);
-      await financialAPI.createQuote(payload);
+      const res = await financialAPI.createQuote(payload);
       addToast('Cotización creada', 'success');
       setShowModal(false);
       loadQuotes();
+      
+      // Auto-open PDF
+      if (res.data && res.data.id) {
+        handlePdfAction(res.data, 'open');
+      }
     } catch (err) {
       addToast(err?.response?.data?.detail || 'Error guardando cotización', 'error');
     } finally {
       setSaving(false);
     }
+  };
+
+  const handlePdfAction = async (q, action = 'download') => {
+    try {
+      addToast(action === 'download' ? 'Descargando...' : 'Generando PDF...', 'info');
+      const res = await api.get(`/quotes/${q.id}/download`, { responseType: 'blob' });
+      const blob = new Blob([res.data], { type: 'application/pdf' });
+      const url = window.URL.createObjectURL(blob);
+      if (action === 'download') {
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', `Cotizacion_${q.id}.pdf`);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      } else {
+        window.open(url, '_blank');
+      }
+    } catch (err) {
+      addToast('Error al generar PDF', 'error');
+    }
+  };
+
+  const handleWhatsApp = (q) => {
+    const total = formatCurrency(Number(q.total_amount || q.total) || 0);
+    const msg = `Hola, te envío la cotización *COT-${q.id}* por un valor de *${total}*. Puedes revisarla aquí o solicitar el PDF.`;
+    window.open(`https://wa.me/?text=${encodeURIComponent(msg)}`, '_blank');
+  };
+
+  const handleAddItem = () => {
+    setForm({ ...form, items: [...form.items, { description: '', quantity: 1, unit_price: 0 }] });
+  };
+
+  const handleItemChange = (index, field, value) => {
+    const newItems = [...form.items];
+    newItems[index][field] = value;
+    
+    const subtotal = newItems.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_price)), 0);
+    const tax = Number(form.tax) || 0;
+    const discount = Number(form.discount) || 0;
+    const ival = subtotal * tax / 100;
+    const disc = subtotal * discount / 100;
+    
+    setForm({ ...form, items: newItems, subtotal, total_amount: subtotal + ival - disc });
+  };
+
+  const handleRemoveItem = (index) => {
+    const newItems = form.items.filter((_, i) => i !== index);
+    const subtotal = newItems.reduce((acc, item) => acc + (Number(item.quantity) * Number(item.unit_price)), 0);
+    const tax = Number(form.tax) || 0;
+    const discount = Number(form.discount) || 0;
+    const ival = subtotal * tax / 100;
+    const disc = subtotal * discount / 100;
+    
+    setForm({ ...form, items: newItems, subtotal, total_amount: subtotal + ival - disc });
   };
 
   const handleApprove = async (q) => {
@@ -210,10 +271,10 @@ export default function Quotes() {
                 </div>
 
                 <div className="grid grid-cols-4 gap-1.5">
-                  <ActionBtn Ic={FaEye} label="Ver" />
-                  <ActionBtn Ic={FaFilePdf} label="PDF" />
-                  <ActionBtn Ic={FaQrcode} label="QR" />
-                  <ActionBtn Ic={FaPrint} label="Imprimir" />
+                  <ActionBtn Ic={FaEye} label="Ver PDF" onClick={() => handlePdfAction(q, 'open')} />
+                  <ActionBtn Ic={FaFilePdf} label="Descargar" onClick={() => handlePdfAction(q, 'download')} />
+                  <ActionBtn Ic={FaPrint} label="Imprimir" onClick={() => handlePdfAction(q, 'open')} />
+                  <ActionBtn Ic={FaWhatsapp} label="WhatsApp" onClick={() => handleWhatsApp(q)} />
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {(q.status || '') !== 'aprobada' && (q.status || '') !== 'rechazada' && <button disabled={processingId === q.id} onClick={() => handleApprove(q)} className="btn-success !py-1.5 !text-xs flex items-center justify-center gap-1"><FaCheck size={11} /> Aprobar</button>}
@@ -256,6 +317,32 @@ export default function Quotes() {
                   </select>
                 </div>
               </div>
+              
+              <div className="border border-dark-600/40 rounded-xl p-4 bg-dark-800/30">
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-bold text-dark-200">Productos / Servicios</h4>
+                  <button type="button" onClick={handleAddItem} className="btn-secondary !py-1 !px-2 !text-[10px]"><FaPlus size={10} /> Añadir Item</button>
+                </div>
+                
+                {form.items.length === 0 && <div className="text-center text-xs text-dark-500 py-4">No has agregado items a esta cotización</div>}
+                
+                <div className="space-y-2">
+                  {form.items.map((item, index) => (
+                    <div key={index} className="flex flex-col md:flex-row gap-2 items-start md:items-center">
+                      <input required value={item.description} onChange={e => handleItemChange(index, 'description', e.target.value)} className="input-field flex-1" placeholder="Descripción del producto o servicio..." />
+                      <div className="flex gap-2 w-full md:w-auto">
+                        <input required type="number" min="1" value={item.quantity} onChange={e => handleItemChange(index, 'quantity', e.target.value)} className="input-field w-20" placeholder="Cant." title="Cantidad" />
+                        <input required type="number" min="0" step="0.01" value={item.unit_price} onChange={e => handleItemChange(index, 'unit_price', e.target.value)} className="input-field w-32" placeholder="Precio Und." title="Precio Unitario" />
+                        <div className="w-32 px-3 py-2 bg-dark-900 rounded-lg border border-dark-700 text-right font-mono text-sm">
+                          {formatCurrency(item.quantity * item.unit_price)}
+                        </div>
+                        <button type="button" onClick={() => handleRemoveItem(index)} className="p-2 text-red-400 hover:text-red-300 hover:bg-red-400/10 rounded-lg transition-colors"><FaTrash size={14} /></button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                 <div>
                   <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Subtotal *</label>
@@ -302,9 +389,9 @@ function Row({ Ic, label, value, highlight }) {
   );
 }
 
-function ActionBtn({ Ic, label }) {
+function ActionBtn({ Ic, label, onClick }) {
   return (
-    <button className="py-2 rounded-lg text-[10px] bg-dark-700/60 hover:bg-primary-600/20 hover:text-primary-300 text-dark-300 border border-dark-600 hover:border-primary-500/40 transition flex flex-col items-center gap-1">
+    <button onClick={onClick} className="py-2 rounded-lg text-[10px] bg-dark-700/60 hover:bg-primary-600/20 hover:text-primary-300 text-dark-300 border border-dark-600 hover:border-primary-500/40 transition flex flex-col items-center gap-1">
       <Ic size={13} />
       {label}
     </button>

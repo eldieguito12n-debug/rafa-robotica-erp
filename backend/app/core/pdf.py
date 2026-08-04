@@ -7,6 +7,8 @@ from reportlab.platypus import (
     SimpleDocTemplate, Paragraph, Spacer, Table, TableStyle,
     Image, HRFlowable
 )
+from reportlab.graphics.shapes import Drawing
+from reportlab.graphics.barcode import qr
 from reportlab.pdfbase import pdfmetrics
 from reportlab.pdfbase.ttfonts import TTFont
 from sqlalchemy.orm import Session
@@ -14,12 +16,12 @@ from ..models import Invoice, Quote, Client, Project
 
 
 EMPRESA_DUMMY = {
-    "nombre": "RoboLab S.A.S.",
-    "nit": "NIT 901.234.567-8",
-    "direccion": "Calle 123 #45-67, Bogotá D.C., Colombia",
-    "telefono": "+57 (1) 555-0123",
-    "email": "contacto@robolab.com.co",
-    "web": "www.robolab.com.co",
+    "nombre": "Rafa Robótica S.A.S.",
+    "nit": "NIT 901.987.654-3",
+    "direccion": "Parque Industrial, Bodega 4, Bogotá D.C.",
+    "telefono": "+57 300 123 4567",
+    "email": "contacto@rafarobotica.com",
+    "web": "www.rafarobotica.com",
     "slogan": "Automatización y Robótica para el Futuro",
 }
 
@@ -322,14 +324,46 @@ def generate_quote_pdf_bytes(db: Session, quote_id: int) -> bytes:
         story.append(Paragraph("Términos y Condiciones", styles["SectionTitle"]))
         story.append(Paragraph(str(quote.terms), styles["NotesText"]))
 
+    story.append(Spacer(1, 40))
+    
+    # Firmas
+    sig_data = [
+        [HRFlowable(width="80%", thickness=0.5, color=colors.HexColor("#aaaaaa")),
+         HRFlowable(width="80%", thickness=0.5, color=colors.HexColor("#aaaaaa"))],
+        [Paragraph("Firma Cliente", styles["FooterText"]),
+         Paragraph("Firma Responsable (Rafa Robótica)", styles["FooterText"])]
+    ]
+    sig_tbl = Table(sig_data, colWidths=[3.25 * inch, 3.25 * inch])
+    sig_tbl.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(sig_tbl)
+
     story.append(Spacer(1, 20))
-    story.append(HRFlowable(width="60%", thickness=0.5, color=colors.HexColor("#aaaaaa")))
-    story.append(Spacer(1, 3))
-    story.append(Paragraph("Atentamente, RoboLab S.A.S.", styles["FooterText"]))
+    
+    # QR Code
+    try:
+        url = f"https://rafarobotica.com/quotes/{quote.id}"
+        qr_code = qr.QrCodeWidget(url)
+        bounds = qr_code.getBounds()
+        w, h = bounds[2] - bounds[0], bounds[3] - bounds[1]
+        d = Drawing(60, 60, transform=[60./w, 0, 0, 60./h, 0, 0])
+        d.add(qr_code)
+        
+        qr_data = [[d, Paragraph("Escanea este código para consultar esta cotización digitalmente.", styles["FooterText"])]]
+        qr_tbl = Table(qr_data, colWidths=[1.0 * inch, 5.5 * inch])
+        qr_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
+        story.append(qr_tbl)
+    except Exception:
+        pass
 
     story.append(Spacer(1, 10))
     story.append(Paragraph(
-        f"Esta cotización está sujeta a cambios sin previo aviso. Sujeto a disponibilidad de inventario.",
+        f"Rafa Robótica S.A.S. - Documento generado automáticamente. Gracias por su preferencia.",
         styles["FooterText"]
     ))
 

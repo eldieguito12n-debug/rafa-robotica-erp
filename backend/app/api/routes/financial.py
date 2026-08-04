@@ -223,6 +223,10 @@ def create_quote(
     q = Quote(**data.model_dump())
     db.add(q)
     db.flush()
+    
+    if not q.quote_number:
+        q.quote_number = f"COT-{q.id:04d}"
+        
     log_activity(db, current_user.id, "crear", "quote", q.id, data.model_dump(mode='json'))
     db.commit()
     db.refresh(q)
