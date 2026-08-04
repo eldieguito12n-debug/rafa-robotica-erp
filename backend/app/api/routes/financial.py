@@ -220,11 +220,15 @@ def create_quote(
     db: Session = Depends(get_db),
     current_user: User = Depends(require_admin),
 ):
+    import uuid
     q = Quote(**data.model_dump())
+    if not q.quote_number:
+        q.quote_number = f"TEMP-{uuid.uuid4().hex[:8]}"
+        
     db.add(q)
     db.flush()
     
-    if not q.quote_number:
+    if q.quote_number.startswith("TEMP-"):
         q.quote_number = f"COT-{q.id:04d}"
         
     log_activity(db, current_user.id, "crear", "quote", q.id, data.model_dump(mode='json'))
