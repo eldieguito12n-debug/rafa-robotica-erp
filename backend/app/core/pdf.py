@@ -96,7 +96,8 @@ def _get_company_header_styles():
     return styles
 
 
-def _build_company_header(styles, width=7.0 * inch):
+def _build_company_header(styles, doc_title="<b>COTIZACIÓN</b>"):
+    width = letter[0] - 1.4 * inch
     empresa = EMPRESA_DUMMY
     
     # Try to load app logo round
@@ -112,7 +113,7 @@ def _build_company_header(styles, width=7.0 * inch):
     if logo_flowable:
         left_tbl = Table([[
             logo_flowable, 
-            [Paragraph(empresa["nombre"], styles["CompanyName"]), Spacer(1, 10), Paragraph(empresa["slogan"], styles["CompanyDetail"])]
+            [Paragraph(empresa["nombre"], styles["CompanyName"]), Spacer(1, 12), Paragraph(empresa["slogan"], styles["CompanyDetail"])]
         ]], colWidths=[1.2*inch, 2.9*inch])
         left_tbl.setStyle(TableStyle([
             ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
@@ -121,14 +122,14 @@ def _build_company_header(styles, width=7.0 * inch):
         header_left.append(left_tbl)
     else:
         header_left.append(Paragraph(empresa["nombre"], styles["CompanyName"]))
-        header_left.append(Spacer(1, 10))
+        header_left.append(Spacer(1, 12))
         header_left.append(Paragraph(empresa["slogan"], styles["CompanyDetail"]))
         
     data = [
         [
             header_left,
             [
-                Paragraph("<b>COTIZACIÓN</b>", styles["DocTitle"]),
+                Paragraph(doc_title, styles["DocTitle"]),
                 Paragraph(f"{empresa['nit']}<br/>{empresa['telefono']}<br/>{empresa['email']}", styles["CompanyDetail"])
             ]
         ]
@@ -560,37 +561,7 @@ def generate_sale_pdf_bytes(db: Session, sale_id: int) -> bytes:
     styles = _get_company_header_styles()
     story = []
 
-    # Header with Logo
-    header_left = []
-    import os
-    logo_path = os.path.join(os.path.dirname(__file__), "..", "static", "images", "logo.jpg")
-    if os.path.exists(logo_path):
-        header_left.append(Image(logo_path, width=1.8*inch, height=1.8*inch))
-    else:
-        header_left.append(Paragraph(EMPRESA_DUMMY["nombre"], styles["CompanyName"]))
-        header_left.append(Paragraph(EMPRESA_DUMMY["slogan"], styles["CompanyDetail"]))
-
-    data = [
-        [
-            header_left,
-            [
-                Paragraph("<b>RECIBO DE VENTA</b>", styles["DocTitle"]),
-                Paragraph(f"{EMPRESA_DUMMY['nit']}<br/>{EMPRESA_DUMMY['telefono']}<br/>{EMPRESA_DUMMY['email']}", styles["CompanyDetail"])
-            ]
-        ]
-    ]
-    header_table = Table(data, colWidths=[letter[0]*0.60 - 1.4*inch, letter[0]*0.40 - 1.4*inch])
-    header_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
-        ("TOPPADDING", (0, 0), (-1, -1), 0),
-        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
-    ]))
-    
-    story.append(header_table)
-    story.append(Spacer(1, 10))
-    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#f1c40f")))
-    story.append(Spacer(1, 15))
+    story.extend(_build_company_header(styles, doc_title="<b>RECIBO DE<br/>VENTA</b>"))
 
     story.append(Paragraph(f"RECIBO DE VENTA #{sale.sale_number}", styles["DocTitle"]))
     story.append(Paragraph(
