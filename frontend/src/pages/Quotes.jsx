@@ -82,7 +82,13 @@ export default function Quotes() {
       if (payload.subtotal !== '') payload.subtotal = Number(payload.subtotal);
       if (payload.tax !== '') payload.tax = Number(payload.tax);
       if (payload.discount !== '') payload.discount = Number(payload.discount);
-      if (payload.total_amount !== '') payload.total_amount = Number(payload.total_amount);
+      
+      payload.total = Number(payload.total_amount);
+      delete payload.total_amount;
+      
+      // La base de datos requiere fecha de creación
+      payload.date = new Date().toISOString().split('T')[0];
+      
       const res = await financialAPI.createQuote(payload);
       addToast('Cotización creada', 'success');
       setShowModal(false);
