@@ -28,7 +28,11 @@ def run_migrations():
             "ALTER TABLE tasks ADD COLUMN approved_by_id INTEGER REFERENCES users(id)",
             "ALTER TABLE tasks ADD COLUMN completed_at TIMESTAMP WITH TIME ZONE",
             "ALTER TABLE tasks ADD COLUMN total_time_spent FLOAT DEFAULT 0.0",
-            "ALTER TABLE tasks ADD COLUMN history JSON DEFAULT '[]'"
+            "ALTER TABLE tasks ADD COLUMN history JSON DEFAULT '[]'",
+            "ALTER TABLE inventory_movements ADD COLUMN user_name VARCHAR(255)",
+            "ALTER TABLE inventory_movements ADD COLUMN user_role VARCHAR(100)",
+            "ALTER TABLE inventory_movements ADD COLUMN project_id INTEGER REFERENCES projects(id)",
+            "CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, title VARCHAR(255) NOT NULL, message VARCHAR(1000), type VARCHAR(100), related_id INTEGER, related_type VARCHAR(100), is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"
         ]
         for q in queries:
             try:
@@ -48,7 +52,11 @@ def migrate_db(db: Session = Depends(get_db)):
         "ALTER TABLE tasks ADD COLUMN approved_by_id INTEGER REFERENCES users(id)",
         "ALTER TABLE tasks ADD COLUMN completed_at TIMESTAMP WITH TIME ZONE",
         "ALTER TABLE tasks ADD COLUMN total_time_spent FLOAT DEFAULT 0.0",
-        "ALTER TABLE tasks ADD COLUMN history JSON DEFAULT '[]'::json"
+        "ALTER TABLE tasks ADD COLUMN history JSON DEFAULT '[]'::json",
+        "ALTER TABLE inventory_movements ADD COLUMN user_name VARCHAR(255)",
+        "ALTER TABLE inventory_movements ADD COLUMN user_role VARCHAR(100)",
+        "ALTER TABLE inventory_movements ADD COLUMN project_id INTEGER REFERENCES projects(id)",
+        "CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, title VARCHAR(255) NOT NULL, message VARCHAR(1000), type VARCHAR(100), related_id INTEGER, related_type VARCHAR(100), is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP)"
     ]
     
     for q in queries:
