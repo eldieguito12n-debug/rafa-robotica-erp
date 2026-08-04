@@ -99,8 +99,8 @@ def _get_company_header_styles():
 def _build_company_header(styles, width=7.0 * inch):
     empresa = EMPRESA_DUMMY
     
-    # Try to load cropped logo
-    logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "logo_cropped.jpg")
+    # Try to load app logo
+    logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "app_logo.png")
     logo_flowable = None
     if os.path.exists(logo_path):
         try:
@@ -435,7 +435,7 @@ def generate_quote_pdf_bytes(db: Session, quote_id: int) -> bytes:
         pass
 
     def add_watermark(c, doc):
-        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "logo_cropped.jpg")
+        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "app_logo.png")
         if os.path.exists(logo_path):
             c.saveState()
             c.translate(4.25*inch, 5.5*inch)
