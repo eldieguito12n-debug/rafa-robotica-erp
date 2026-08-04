@@ -265,31 +265,57 @@ def download_quote_pdf(
 
 
 @router.post("/quotes/{quote_id}/approve")
-def approve_quote(quote_id: int, convert_to_project: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
+def approve_quote(quote_id: int, convert_to_sale: bool = False, db: Session = Depends(get_db), current_user: User = Depends(require_admin)):
     q = db.query(Quote).filter(Quote.id == quote_id).first()
     if not q:
         raise HTTPException(404, "Quote not found")
     q.status = "aprobada"
     db.flush()
-    log_activity(db, current_user.id, "actualizar", "quote", q.id, {"status": "aprobada", "convert_to_project": convert_to_project})
-    if convert_to_project:
-        from ...models import Project
+    log_activity(db, current_user.id, "actualizar", "quote", q.id, {"status": "aprobada", "convert_to_sale": convert_to_sale})
+    if convert_to_sale:
+        from ...models import DirectSale, FinancialRecord
         from datetime import datetime
-        p = Project(
-            name=q.title or f"Proyecto desde Cotización #{q.id}",
-            client_id=q.client_id,
-            description=q.notes or "",
-            budget=q.total_amount,
-            start_date=date.today(),
-            status="planeacion",
-            progress_percentage=0,
-            created_at=datetime.utcnow(),
+        import uuid
+        
+        sale_number = f"VEN-{str(uuid.uuid4())[:8]}"
+        client_name = ""
+        if q.client_id:
+            from ...models import User
+            c = db.query(User).filter(User.id == q.client_id).first()
+            if c:
+                client_name = c.full_name
+                
+        # Crear Venta Directa
+        s = DirectSale(
+            sale_number=sale_number,
+            client_name=client_name or "Cliente Cotización",
+            description=q.title or f"Venta de Cotización #{q.quote_number}",
+            total_amount=q.total_amount,
+            payment_method="transferencia", # Default
+            observations=q.notes or "Venta generada desde cotización",
+            created_by_id=current_user.id
         )
-        db.add(p)
+        db.add(s)
         db.flush()
-        log_activity(db, current_user.id, "crear", "project", p.id, {"source": "quote", "quote_id": q.id})
+        
+        # Crear Registro Financiero
+        fin_record = FinancialRecord(
+            type="venta",
+            description=s.description,
+            amount=s.total_amount,
+            date=datetime.utcnow().date(),
+            category="Venta Directa",
+            reference=sale_number,
+            payment_method=s.payment_method,
+            notes=s.observations,
+            user_id=current_user.id
+        )
+        db.add(fin_record)
+        db.flush()
+        
+        log_activity(db, current_user.id, "crear", "direct_sale", s.id, {"source": "quote", "quote_id": q.id})
     db.commit()
-    return {"message": "Quote approved", "project_created": convert_to_project}
+    return {"message": "Quote approved", "sale_created": convert_to_sale}
 
 
 # ===== FINANCIAL RECORDS: Detail, Update, Delete =====

@@ -199,11 +199,11 @@ export default function Quotes() {
   };
 
   const handleApprove = async (q) => {
-    const convert = window.confirm('¿Aprobar cotización?\n\n¿Desea convertirla automáticamente en proyecto?\nAceptar = Convertir a Proyecto\nCancelar = Solo aprobar');
+    const convert = window.confirm('¿Aprobar cotización?\n\n¿Desea convertirla automáticamente en una Venta Directa?\nAceptar = Convertir a Venta\nCancelar = Solo aprobar');
     setProcessingId(q.id);
     try {
       await financialAPI.approveQuote(q.id, convert);
-      addToast(convert ? 'Cotización aprobada y convertida a proyecto' : 'Cotización aprobada', 'success');
+      addToast(convert ? 'Cotización aprobada y convertida a Venta Directa' : 'Cotización aprobada', 'success');
       loadQuotes();
     } catch (err) {
       addToast(err?.response?.data?.detail || 'Error al aprobar', 'error');
