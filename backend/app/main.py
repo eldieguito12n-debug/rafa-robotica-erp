@@ -119,6 +119,25 @@ def public_download_quote_pdf(quote_id: int, db: Session = Depends(get_db)):
     )
 
 
+@app.get("/api/v1/public/sales/{sale_id}/pdf", tags=["Public"])
+def public_download_sale_pdf(sale_id: int, db: Session = Depends(get_db)):
+    from .core.pdf import generate_sale_pdf_bytes
+    from .models import DirectSale
+    s = db.query(DirectSale).filter(DirectSale.id == sale_id).first()
+    if not s:
+        raise HTTPException(404, "Sale not found")
+    try:
+        pdf_bytes = generate_sale_pdf_bytes(db, sale_id)
+    except Exception as e:
+        raise HTTPException(500, f"Error generating PDF: {str(e)}")
+        
+    filename = f"Venta_{sale_id}.pdf"
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"inline; filename={filename}"},
+    )
+
 from sqlalchemy import text
 
 @app.get("/api/v1/health")

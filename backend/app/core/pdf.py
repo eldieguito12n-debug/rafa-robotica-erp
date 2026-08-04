@@ -535,3 +535,166 @@ def generate_financial_summary_pdf_bytes(records, title="Resumen Financiero") ->
 
     doc.build(story)
     return buffer.getvalue()
+
+
+def generate_sale_pdf_bytes(db: Session, sale_id: int) -> bytes:
+    from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, Image, Table, TableStyle, HRFlowable
+    from reportlab.lib.pagesizes import letter
+    from reportlab.lib.units import inch
+    from reportlab.lib import colors
+    import reportlab.graphics.barcode.qr as qr
+    from io import BytesIO
+    from ..models import DirectSale
+
+    sale = db.query(DirectSale).filter(DirectSale.id == sale_id).first()
+    if not sale:
+        raise ValueError("Sale not found")
+
+    buffer = BytesIO()
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter,
+        leftMargin=0.7 * inch, rightMargin=0.7 * inch,
+        topMargin=0.6 * inch, bottomMargin=0.7 * inch,
+        title=f"Venta_{sale.sale_number}"
+    )
+    styles = _get_company_header_styles()
+    story = []
+
+    # Header with Logo
+    header_left = []
+    import os
+    logo_path = os.path.join(os.path.dirname(__file__), "..", "static", "images", "logo.jpg")
+    if os.path.exists(logo_path):
+        header_left.append(Image(logo_path, width=1.8*inch, height=1.8*inch))
+    else:
+        header_left.append(Paragraph(EMPRESA_DUMMY["nombre"], styles["CompanyName"]))
+        header_left.append(Paragraph(EMPRESA_DUMMY["slogan"], styles["CompanyDetail"]))
+
+    data = [
+        [
+            header_left,
+            [
+                Paragraph("<b>RECIBO DE VENTA</b>", styles["DocTitle"]),
+                Paragraph(f"{EMPRESA_DUMMY['nit']}<br/>{EMPRESA_DUMMY['telefono']}<br/>{EMPRESA_DUMMY['email']}", styles["CompanyDetail"])
+            ]
+        ]
+    ]
+    header_table = Table(data, colWidths=[letter[0]*0.60 - 1.4*inch, letter[0]*0.40 - 1.4*inch])
+    header_table.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("TOPPADDING", (0, 0), (-1, -1), 0),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
+    ]))
+    
+    story.append(header_table)
+    story.append(Spacer(1, 10))
+    story.append(HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#f1c40f")))
+    story.append(Spacer(1, 15))
+
+    story.append(Paragraph(f"RECIBO DE VENTA #{sale.sale_number}", styles["DocTitle"]))
+    story.append(Paragraph(
+        f"Fecha: {sale.created_at.strftime('%Y-%m-%d %H:%M') if sale.created_at else ''} &nbsp;|&nbsp; Método de pago: {sale.payment_method or 'N/A'}",
+        styles["DocSubtitle"]
+    ))
+
+    if sale.client_name:
+        story.append(Paragraph("Información del Cliente", styles["SectionTitle"]))
+        cl_tbl = Table([
+            [Paragraph("<b>Cliente:</b>", styles["LabelText"]), Paragraph(sale.client_name, styles["ValueText"])]
+        ], colWidths=[1.2 * inch, 5.0 * inch])
+        cl_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+        ]))
+        story.append(cl_tbl)
+        story.append(Spacer(1, 10))
+
+    story.append(Paragraph("Detalle de la Venta", styles["SectionTitle"]))
+    items_data = [
+        ["Descripción", "Cantidad", "V. Unitario", "Subtotal"],
+        [Paragraph(sale.description, styles["ValueText"]), "1", f"${float(sale.total_amount):,.0f}", f"${float(sale.total_amount):,.0f}"]
+    ]
+    items_tbl = Table(items_data, colWidths=[3.2 * inch, 1.0 * inch, 1.4 * inch, 1.4 * inch], repeatRows=1)
+    items_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 9),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 1), (-1, -1), 9),
+        ("ALIGN", (1, 0), (-1, -1), "CENTER"),
+        ("ALIGN", (0, 0), (0, -1), "LEFT"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white]),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    story.append(items_tbl)
+    story.append(Spacer(1, 12))
+
+    # Totals
+    tot_data = [
+        ["SUBTOTAL:", f"${float(sale.total_amount):,.0f}"],
+        ["TOTAL:", f"${float(sale.total_amount):,.0f}"]
+    ]
+    tot_tbl = Table(tot_data, colWidths=[1.8 * inch, 1.4 * inch])
+    tot_tbl.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica"),
+        ("FONTNAME", (0, 1), (-1, 1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("ALIGN", (0, 0), (0, -1), "RIGHT"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#f1c40f")),
+        ("TEXTCOLOR", (0, -1), (-1, -1), colors.black),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+
+    notes_para = Paragraph(f"<b>Observaciones:</b><br/>{sale.observations}" if sale.observations else "", styles["NotesText"])
+    bottom_tbl = Table([[notes_para, tot_tbl]], colWidths=[3.2*inch, 3.8*inch])
+    bottom_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+    ]))
+    story.append(bottom_tbl)
+    story.append(Spacer(1, 40))
+    
+    # Firmas
+    sig_data = [
+        [HRFlowable(width="80%", thickness=0.5, color=colors.HexColor("#aaaaaa")),
+         HRFlowable(width="80%", thickness=0.5, color=colors.HexColor("#aaaaaa"))],
+        [Paragraph(f"Firma Cliente<br/>{sale.client_name or ''}", styles["FooterText"]),
+         Paragraph("Firma Responsable<br/>RAFA ROBOTICA", styles["FooterText"])]
+    ]
+    sig_tbl = Table(sig_data, colWidths=[3.5 * inch, 3.5 * inch])
+    sig_tbl.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(sig_tbl)
+
+    story.append(Spacer(1, 20))
+    
+    # QR Code
+    try:
+        url = f"https://backend-six-omega-27.vercel.app/api/v1/public/sales/{sale.id}/pdf"
+        qr_code = qr.QrCodeWidget(url)
+        bounds = qr_code.getBounds()
+        w, h = bounds[2] - bounds[0], bounds[3] - bounds[1]
+        story.append(Table([[qr_code]], colWidths=[w], rowHeights=[h], style=[('ALIGN', (0,0), (-1,-1), 'CENTER')]))
+    except Exception as e:
+        pass
+
+    story.append(Spacer(1, 10))
+    story.append(Paragraph(
+        f"RAFA ROBOTICA - Documento generado automáticamente. Gracias por su preferencia.",
+        styles["FooterText"]
+    ))
+
+    doc.build(story)
+    return buffer.getvalue()

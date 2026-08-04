@@ -8,12 +8,13 @@ from ...core.database import get_db
 from ...core.security import get_current_user, require_admin
 from ...core.activity_middleware import log_activity
 from ...core.pdf import generate_invoice_pdf_bytes, generate_quote_pdf_bytes
-from ...models import FinancialRecord, Invoice, Payment, Quote, Client, User
+from ...models import FinancialRecord, Invoice, Payment, Quote, Client, User, DirectSale
 from ...schemas import (
     FinancialRecord as FinSchema, FinancialRecordCreate,
     Invoice as InvoiceSchema, InvoiceCreate,
     Payment as PaymentSchema, PaymentCreate,
     Quote as QuoteSchema, QuoteCreate,
+    DirectSale as DirectSaleSchema, DirectSaleCreate
 )
 
 router = APIRouter(tags=["Financial & Clients"])
@@ -469,3 +470,54 @@ def delete_quote(
     db.delete(q)
     db.commit()
     return {"message": "Quote deleted"}
+
+
+# ===== DIRECT SALES =====
+
+@router.get("/sales", response_model=List[DirectSaleSchema])
+def list_sales(
+    limit: int = 100,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    return db.query(DirectSale).order_by(DirectSale.created_at.desc()).limit(limit).all()
+
+
+@router.post("/sales", response_model=DirectSaleSchema)
+def create_sale(
+    data: DirectSaleCreate,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    import uuid
+    sale_number = f"VEN-{str(uuid.uuid4())[:8]}"
+    s = DirectSale(
+        **data.model_dump(),
+        sale_number=sale_number,
+        created_by_id=current_user.id
+    )
+    db.add(s)
+    db.flush()
+    log_activity(db, current_user.id, "crear", "direct_sale", s.id, {"sale_number": sale_number})
+    db.commit()
+    db.refresh(s)
+    return s
+
+
+@router.get("/sales/{sale_id}/pdf")
+def download_sale_pdf(
+    sale_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    s = db.query(DirectSale).filter(DirectSale.id == sale_id).first()
+    if not s:
+        raise HTTPException(404, "Sale not found")
+    from ...core.pdf import generate_sale_pdf_bytes
+    pdf_bytes = generate_sale_pdf_bytes(db, sale_id)
+    filename = f"Venta_{sale_id}.pdf"
+    return StreamingResponse(
+        BytesIO(pdf_bytes),
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={filename}"},
+    )

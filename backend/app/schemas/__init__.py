@@ -510,3 +510,25 @@ class DashboardStats(BaseModel):
     labs: List[Lab] = []
     recent_activity: List[Dict[str, Any]] = []
     kpis: Dict[str, Any] = {}
+
+
+class DirectSaleBase(BaseModel):
+    client_name: Optional[str] = None
+    description: str
+    total_amount: float
+    payment_method: Optional[str] = None
+    observations: Optional[str] = None
+
+
+class DirectSaleCreate(DirectSaleBase):
+    pass
+
+
+class DirectSale(DirectSaleBase):
+    id: int
+    sale_number: str
+    created_by_id: Optional[int] = None
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True

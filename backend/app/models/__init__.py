@@ -471,3 +471,19 @@ class ActivityLog(Base):
     created_at = Column(DateTime(timezone=True), server_default=func.now(), index=True)
 
     user = relationship("User", back_populates="activity_logs")
+
+
+class DirectSale(Base):
+    __tablename__ = "direct_sales"
+
+    id = Column(Integer, primary_key=True, index=True)
+    sale_number = Column(String(50), unique=True, index=True)
+    client_name = Column(String(255))
+    description = Column(Text, nullable=False)
+    total_amount = Column(Float, nullable=False, default=0.0)
+    payment_method = Column(String(100))
+    observations = Column(Text)
+    created_by_id = Column(Integer, ForeignKey("users.id"))
+    created_at = Column(DateTime(timezone=True), server_default=func.now())
+    
+    created_by = relationship("User", foreign_keys=[created_by_id])
