@@ -128,7 +128,7 @@ export default function Inventory() {
       await inventoryAPI.remove(it.id);
       addToast('Artículo eliminado', 'success');
       load();
-    } catch { addToast('Error eliminando artículo', 'error'); }
+    } catch (err) { addToast(err?.response?.data?.detail || 'Error eliminando artículo', 'error'); }
   };
 
   const openMove = (type, it) => {
