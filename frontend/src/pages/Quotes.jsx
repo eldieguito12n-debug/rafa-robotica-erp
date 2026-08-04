@@ -188,6 +188,20 @@ export default function Quotes() {
     }
   };
 
+  const handleDelete = async (q) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta cotización permanentemente?')) return;
+    setProcessingId(q.id);
+    try {
+      await financialAPI.removeQuote(q.id);
+      addToast('Cotización eliminada correctamente', 'success');
+      loadQuotes();
+    } catch (err) {
+      addToast(err?.response?.data?.detail || 'Error al eliminar', 'error');
+    } finally {
+      setProcessingId(null);
+    }
+  };
+
   const getClientName = (q) => {
     if (q.client_name) return q.client_name;
     if (q.client) return q.client;
@@ -276,11 +290,12 @@ export default function Quotes() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-1.5">
+                <div className="grid grid-cols-5 gap-1.5">
                   <ActionBtn Ic={FaEye} label="Ver PDF" onClick={() => handlePdfAction(q, 'open')} />
                   <ActionBtn Ic={FaFilePdf} label="Descargar" onClick={() => handlePdfAction(q, 'download')} />
                   <ActionBtn Ic={FaPrint} label="Imprimir" onClick={() => handlePdfAction(q, 'open')} />
                   <ActionBtn Ic={FaWhatsapp} label="WhatsApp" onClick={() => handleWhatsApp(q)} />
+                  <ActionBtn Ic={FaTrash} label="Eliminar" onClick={() => handleDelete(q)} className="!bg-red-500/10 !text-red-500 !border-red-500/30 hover:!bg-red-500 hover:!text-white" />
                 </div>
                 <div className="mt-3 grid grid-cols-2 gap-2">
                   {(q.status || '') !== 'aprobada' && (q.status || '') !== 'rechazada' && <button disabled={processingId === q.id} onClick={() => handleApprove(q)} className="btn-success !py-1.5 !text-xs flex items-center justify-center gap-1"><FaCheck size={11} /> Aprobar</button>}
@@ -395,9 +410,9 @@ function Row({ Ic, label, value, highlight }) {
   );
 }
 
-function ActionBtn({ Ic, label, onClick }) {
+function ActionBtn({ Ic, label, onClick, className }) {
   return (
-    <button onClick={onClick} className="py-2 rounded-lg text-[10px] bg-dark-700/60 hover:bg-primary-600/20 hover:text-primary-300 text-dark-300 border border-dark-600 hover:border-primary-500/40 transition flex flex-col items-center gap-1">
+    <button onClick={onClick} className={cn("py-2 rounded-lg text-[10px] bg-dark-700/60 hover:bg-primary-600/20 hover:text-primary-300 text-dark-300 border border-dark-600 hover:border-primary-500/40 transition flex flex-col items-center gap-1", className)}>
       <Ic size={13} />
       {label}
     </button>
