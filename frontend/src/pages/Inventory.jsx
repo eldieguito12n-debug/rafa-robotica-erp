@@ -155,6 +155,33 @@ export default function Inventory() {
     !search || i.name.toLowerCase().includes(search.toLowerCase()) || (i.sku || '').toLowerCase().includes(search.toLowerCase())
   );
 
+  const handleExportExcel = () => {
+    const csvContent = [
+      ['ID', 'Nombre', 'Categoria', 'SKU', 'Cantidad', 'Min Stock', 'Costo Unitario', 'Valor Total', 'Proveedor', 'Ubicacion'].join(','),
+      ...list.map(it => [
+        it.id,
+        `"${(it.name || '').replace(/"/g, '""')}"`,
+        `"${(it.category || '').replace(/"/g, '""')}"`,
+        `"${(it.sku || '').replace(/"/g, '""')}"`,
+        it.quantity || 0,
+        it.min_stock || 0,
+        it.unit_cost || 0,
+        (it.quantity || 0) * (it.unit_cost || 0),
+        `"${(it.supplier || '').replace(/"/g, '""')}"`,
+        `"${(it.location || '').replace(/"/g, '""')}"`
+      ].join(','))
+    ].join('\n');
+    
+    const blob = new Blob(['\uFEFF' + csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.setAttribute('download', `inventario_${new Date().toISOString().split('T')[0]}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const totals = list.reduce((acc, i) => {
     acc.value += (i.quantity || 0) * (i.unit_cost || 0);
     acc.quantity += i.quantity || 0;
@@ -191,7 +218,7 @@ export default function Inventory() {
             <FaExclamationTriangle size={12} /> Stock bajo
           </button>
           <RoleGuard adminOnly>
-            <button className="btn-secondary !px-3 !py-2 !text-sm"><FaFileExport size={12} /> Excel</button>
+            <button onClick={handleExportExcel} className="btn-secondary !px-3 !py-2 !text-sm"><FaFileExport size={12} /> Excel</button>
             <button className="btn-primary !px-3 !py-2 !text-sm" onClick={openNewItem}><FaPlus size={12} /> Nuevo Item</button>
           </RoleGuard>
         </div>
