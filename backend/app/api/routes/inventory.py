@@ -176,6 +176,24 @@ def move_inventory(
         db, current_user.id, "movimiento_inventario", "inventory_item", item.id,
         {"movement_type": movement_type, "quantity": quantity, "reference": reference, "project_id": project_id},
     )
+    
+    # Notificar a los administradores si es un retiro (salida)
+    if movement_type == "salida":
+        from ...models import User, Notification
+        from ...core.security import ADMIN_ROLES
+        admins = db.query(User).filter(User.role.in_(ADMIN_ROLES)).all()
+        for admin in admins:
+            if admin.id != current_user.id:
+                notif = Notification(
+                    user_id=admin.id,
+                    title="Retiro de Inventario",
+                    message=f"{current_user.full_name} retiró {quantity} u. de '{item.name}'. Motivo: {notes or reference or 'N/A'}",
+                    type="inventory_alert",
+                    related_id=item.id,
+                    related_type="inventory_item"
+                )
+                db.add(notif)
+    
     db.commit()
 
     stock_msg = "Sin existencias" if item.quantity == 0 else f"{item.quantity} unidad(es)"
@@ -272,6 +290,9 @@ def get_inventory_history(
     item_id: Optional[int] = None,
     movement_type: Optional[str] = None,
     user_id: Optional[int] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    search: Optional[str] = None,
     skip: int = 0,
     limit: int = 200,
     db: Session = Depends(get_db),
@@ -294,6 +315,29 @@ def get_inventory_history(
         q = q.filter(InventoryMovement.item_id == item_id)
     if movement_type:
         q = q.filter(InventoryMovement.type == movement_type)
+        
+    if start_date:
+        from datetime import datetime
+        try:
+            sd = datetime.strptime(start_date, "%Y-%m-%d")
+            q = q.filter(InventoryMovement.created_at >= sd)
+        except ValueError:
+            pass
+    if end_date:
+        from datetime import datetime, timedelta
+        try:
+            ed = datetime.strptime(end_date, "%Y-%m-%d")
+            q = q.filter(InventoryMovement.created_at < ed + timedelta(days=1))
+        except ValueError:
+            pass
+            
+    if search:
+        search_term = f"%{search}%"
+        q = q.filter(
+            (InventoryMovement.user_name.ilike(search_term)) |
+            (InventoryMovement.reference.ilike(search_term)) |
+            (InventoryMovement.notes.ilike(search_term))
+        )
 
     movements = q.order_by(InventoryMovement.created_at.desc()).offset(skip).limit(limit).all()
 

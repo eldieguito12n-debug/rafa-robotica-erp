@@ -29,11 +29,22 @@ export default function Inventory() {
   const [historyLoading, setHistoryLoading] = useState(false);
   const [search, setSearch] = useState('');
   const [debouncedSearch, setDebouncedSearch] = useState('');
+  
+  const [histSearch, setHistSearch] = useState('');
+  const [debouncedHistSearch, setDebouncedHistSearch] = useState('');
+  const [histStartDate, setHistStartDate] = useState('');
+  const [histEndDate, setHistEndDate] = useState('');
 
   useEffect(() => {
     const t = setTimeout(() => setDebouncedSearch(search), 400);
     return () => clearTimeout(t);
   }, [search]);
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedHistSearch(histSearch), 400);
+    return () => clearTimeout(t);
+  }, [histSearch]);
+  
   const [cat, setCat] = useState('');
   const [lowOnly, setLowOnly] = useState(false);
 
@@ -65,15 +76,20 @@ export default function Inventory() {
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
     try {
-      const res = await inventoryAPI.history({ limit: 200 });
+      const res = await inventoryAPI.history({ 
+        limit: 200,
+        search: debouncedHistSearch || undefined,
+        start_date: histStartDate || undefined,
+        end_date: histEndDate || undefined
+      });
       setHistory(Array.isArray(res?.data) ? res.data : []);
     } catch {
       addToast('Error cargando historial', 'error');
     } finally { setHistoryLoading(false); }
-  }, [addToast]);
+  }, [debouncedHistSearch, histStartDate, histEndDate, addToast]);
 
   useEffect(() => { load(); }, [cat, lowOnly, debouncedSearch]);
-  useEffect(() => { if (tab === 'history') loadHistory(); }, [tab]);
+  useEffect(() => { if (tab === 'history') loadHistory(); }, [tab, debouncedHistSearch, histStartDate, histEndDate]);
 
   const openNewItem = () => {
     setEditingItem(null);
@@ -379,6 +395,43 @@ export default function Inventory() {
       {/* ─── Tab Historial ─────────────────────────────────── */}
       {tab === 'history' && (
         <div className="card hud-corner !p-0 overflow-hidden">
+          <div className="p-4 border-b border-dark-600/60 flex flex-wrap gap-3 bg-dark-800/40">
+            <div className="relative">
+              <FaSearch className="absolute left-3 top-1/2 -translate-y-1/2 text-dark-500" size={13} />
+              <input 
+                value={histSearch} 
+                onChange={e => setHistSearch(e.target.value)} 
+                placeholder="Buscar por usuario, artículo o referencia..." 
+                className="input-field !py-2 !pl-8 text-sm w-full md:w-64" 
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-dark-400 font-semibold">Desde:</span>
+              <input 
+                type="date" 
+                value={histStartDate} 
+                onChange={e => setHistStartDate(e.target.value)} 
+                className="input-field !py-2 text-sm" 
+              />
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-dark-400 font-semibold">Hasta:</span>
+              <input 
+                type="date" 
+                value={histEndDate} 
+                onChange={e => setHistEndDate(e.target.value)} 
+                className="input-field !py-2 text-sm" 
+              />
+            </div>
+            {(histSearch || histStartDate || histEndDate) && (
+              <button 
+                onClick={() => { setHistSearch(''); setHistStartDate(''); setHistEndDate(''); }} 
+                className="btn-secondary !py-2 !px-3 !text-xs"
+              >
+                Limpiar Filtros
+              </button>
+            )}
+          </div>
           <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-dark-800/70 border-b border-dark-600/60 text-xs uppercase tracking-wider text-dark-400">
