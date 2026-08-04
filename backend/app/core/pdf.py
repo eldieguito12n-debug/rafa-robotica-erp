@@ -561,7 +561,7 @@ def generate_sale_pdf_bytes(db: Session, sale_id: int) -> bytes:
     styles = _get_company_header_styles()
     story = []
 
-    story.extend(_build_company_header(styles, doc_title="<b>RECIBO DE<br/>VENTA</b>"))
+    story.extend(_build_company_header(styles, doc_title="<b><font size=14>RECIBO DE<br/>VENTA</font></b>"))
 
     story.append(Paragraph(f"RECIBO DE VENTA #{sale.sale_number}", styles["DocTitle"]))
     story.append(Paragraph(
@@ -657,7 +657,15 @@ def generate_sale_pdf_bytes(db: Session, sale_id: int) -> bytes:
         qr_code = qr.QrCodeWidget(url)
         bounds = qr_code.getBounds()
         w, h = bounds[2] - bounds[0], bounds[3] - bounds[1]
-        story.append(Table([[qr_code]], colWidths=[w], rowHeights=[h], style=[('ALIGN', (0,0), (-1,-1), 'CENTER')]))
+        d = Drawing(60, 60, transform=[60./w, 0, 0, 60./h, 0, 0])
+        d.add(qr_code)
+        
+        qr_data = [[d, Paragraph("Escanea este código para consultar esta venta digitalmente.", styles["FooterText"])]]
+        qr_tbl = Table(qr_data, colWidths=[1.0 * inch, 5.5 * inch])
+        qr_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
+        story.append(qr_tbl)
     except Exception as e:
         pass
 
