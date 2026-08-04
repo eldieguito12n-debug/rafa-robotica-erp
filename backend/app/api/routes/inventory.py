@@ -260,12 +260,15 @@ def delete_inventory_item(
     if not item:
         raise HTTPException(404, "Artículo no encontrado")
     log_activity(db, current_user.id, "eliminar", "inventory_item", item.id, {"name": item.name, "sku": item.sku})
-    
-    # Explicitly delete related movements to avoid foreign key constraint errors
-    db.query(InventoryMovement).filter(InventoryMovement.item_id == item.id).delete(synchronize_session=False)
-    
-    db.delete(item)
-    db.commit()
+    try:
+        # Explicitly delete related movements to avoid foreign key constraint errors
+        db.query(InventoryMovement).filter(InventoryMovement.item_id == item.id).delete(synchronize_session=False)
+        
+        db.delete(item)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        raise HTTPException(status_code=400, detail=f"Database error: {str(e)}")
     return {"message": "Artículo eliminado"}
 
 
