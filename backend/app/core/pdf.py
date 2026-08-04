@@ -148,7 +148,9 @@ def _build_company_header(styles, width=7.0 * inch):
 
 def _client_info_section(client: Client, project: Project = None):
     lines = []
-    lines.append(["<b>Cliente:</b>", client.company_name or (client.user.full_name if client and client.user else "N/A")])
+    if not client:
+        return lines
+    lines.append(["<b>Cliente:</b>", client.company_name or (client.user.full_name if hasattr(client, 'user') and client.user else "N/A")])
     if client and client.nit:
         lines.append(["<b>NIT/CC:</b>", client.nit])
     if client and client.contact_name:
@@ -166,16 +168,32 @@ def _build_items_table(items, styles):
     total_items = 0
     for idx, it in enumerate(items or [], start=1):
         desc = it.get("description") or it.get("name") or ""
-        qty = it.get("quantity") or it.get("qty") or 0
-        price = it.get("unit_price") or it.get("price") or it.get("value") or 0
-        subtotal = it.get("subtotal") or (qty * price)
+        qty_raw = it.get("quantity") or it.get("qty") or 0
+        price_raw = it.get("unit_price") or it.get("price") or it.get("value") or 0
+        
+        try:
+            qty = float(qty_raw)
+        except Exception:
+            qty = 0.0
+            
+        try:
+            price = float(price_raw)
+        except Exception:
+            price = 0.0
+            
+        subtotal_raw = it.get("subtotal")
+        try:
+            subtotal = float(subtotal_raw) if subtotal_raw is not None else (qty * price)
+        except Exception:
+            subtotal = qty * price
+            
         total_items += subtotal
         data.append([
             str(idx),
             Paragraph(str(desc), styles["ValueText"]),
-            str(qty),
-            f"${float(price):,.0f}",
-            f"${float(subtotal):,.0f}",
+            str(qty_raw),
+            f"${price:,.0f}",
+            f"${subtotal:,.0f}",
         ])
     if not items:
         data.append(["-", "Sin ítems", "-", "-", "-"])
