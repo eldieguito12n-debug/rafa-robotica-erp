@@ -490,6 +490,7 @@ def create_sale(
     current_user: User = Depends(require_admin),
 ):
     import uuid
+    from datetime import datetime
     sale_number = f"VEN-{str(uuid.uuid4())[:8]}"
     s = DirectSale(
         **data.model_dump(),
@@ -498,6 +499,21 @@ def create_sale(
     )
     db.add(s)
     db.flush()
+    
+    # Automatically register this sale as an income in Financial Records
+    fin_record = FinancialRecord(
+        type="venta",
+        description=s.description or "Venta Directa",
+        amount=s.total_amount,
+        date=datetime.utcnow().date(),
+        category="Venta Directa",
+        reference=sale_number,
+        payment_method=s.payment_method,
+        notes=s.observations,
+        user_id=current_user.id
+    )
+    db.add(fin_record)
+    
     log_activity(db, current_user.id, "crear", "direct_sale", s.id, {"sale_number": sale_number})
     db.commit()
     db.refresh(s)
