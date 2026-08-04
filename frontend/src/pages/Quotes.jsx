@@ -310,8 +310,8 @@ export default function Quotes() {
             <FaQuoteLeft size={22} className="text-neon-yellow" />
           </div>
           <div>
-            <h2 className="text-xl font-bold heading-glow">Cotizaciones</h2>
-            <p className="text-xs text-dark-400">Genera cotizaciones profesionales con logo, firma y QR</p>
+            <h2 className="text-xl font-bold heading-glow">Ventas y Cotizaciones</h2>
+            <p className="text-xs text-dark-400">Gestiona tus ventas y genera cotizaciones profesionales con logo, firma y QR</p>
           </div>
         </div>
         <div className="md:ml-auto flex flex-wrap items-center gap-2">
