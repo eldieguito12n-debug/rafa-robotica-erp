@@ -99,19 +99,26 @@ def _get_company_header_styles():
 def _build_company_header(styles, width=7.0 * inch):
     empresa = EMPRESA_DUMMY
     
-    # Try to load app logo
-    logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "app_logo.png")
+    # Try to load app logo round
+    logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "app_logo_round.png")
     logo_flowable = None
     if os.path.exists(logo_path):
         try:
-            logo_flowable = Image(logo_path, width=3.5*inch, height=1.2*inch, kind='proportional')
-            logo_flowable.hAlign = 'LEFT'
+            logo_flowable = Image(logo_path, width=1.0*inch, height=1.0*inch, kind='proportional')
         except Exception:
             pass
             
     header_left = []
     if logo_flowable:
-        header_left.append(logo_flowable)
+        left_tbl = Table([[
+            logo_flowable, 
+            [Paragraph(empresa["nombre"], styles["CompanyName"]), Paragraph(empresa["slogan"], styles["CompanyDetail"])]
+        ]], colWidths=[1.2*inch, 2.9*inch])
+        left_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+            ("LEFTPADDING", (0, 0), (-1, -1), 0),
+        ]))
+        header_left.append(left_tbl)
     else:
         header_left.append(Paragraph(empresa["nombre"], styles["CompanyName"]))
         header_left.append(Paragraph(empresa["slogan"], styles["CompanyDetail"]))
@@ -434,21 +441,7 @@ def generate_quote_pdf_bytes(db: Session, quote_id: int) -> bytes:
     except Exception:
         pass
 
-    def add_watermark(c, doc):
-        logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "app_logo.png")
-        if os.path.exists(logo_path):
-            c.saveState()
-            c.translate(4.25*inch, 5.5*inch)
-            c.rotate(45)
-            c.setFillAlpha(0.15)
-            try:
-                # Use absolute path and draw image
-                c.drawImage(logo_path, -2.5*inch, -1.0*inch, width=5.0*inch, height=2.0*inch, preserveAspectRatio=True, mask='auto')
-            except Exception:
-                pass
-            c.restoreState()
-
-    doc.build(story, onFirstPage=add_watermark, onLaterPages=add_watermark)
+    doc.build(story)
     return buffer.getvalue()
 
 
