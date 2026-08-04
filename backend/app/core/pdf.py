@@ -1,4 +1,6 @@
+import os
 from io import BytesIO
+from datetime import datetime
 from reportlab.lib.pagesizes import letter, A4
 from reportlab.lib import colors
 from reportlab.lib.units import inch, mm
@@ -266,108 +268,136 @@ def generate_invoice_pdf_bytes(db: Session, invoice_id: int) -> bytes:
 
 
 def generate_quote_pdf_bytes(db: Session, quote_id: int) -> bytes:
+    from reportlab.pdfgen import canvas
+    
     quote = db.query(Quote).filter(Quote.id == quote_id).first()
     if not quote:
         raise ValueError(f"Quote {quote_id} not found")
     client = quote.client
-    project = quote.project
 
     buffer = BytesIO()
-    doc = SimpleDocTemplate(
-        buffer, pagesize=letter,
-        leftMargin=0.7 * inch, rightMargin=0.7 * inch,
-        topMargin=0.6 * inch, bottomMargin=0.7 * inch,
-        title=f"Cotizacion_{quote_id}"
-    )
-    styles = _get_company_header_styles()
-    story = []
-
-    story.extend(_build_company_header(styles))
-
-    story.append(Paragraph(f"COTIZACIÓN #{quote.quote_number or quote.id}", styles["DocTitle"]))
-    status_str = (quote.status.value if hasattr(quote.status, 'value') else str(quote.status)).upper()
-    title_str = f"<b>{quote.title}</b><br/>" if quote.title else ""
-    valid_str = f" &nbsp;|&nbsp; Válido hasta: {quote.valid_until}" if quote.valid_until else ""
-    story.append(Paragraph(
-        f"{title_str}ID: {quote.id} &nbsp;|&nbsp; Fecha: {quote.date} &nbsp;|&nbsp; Estado: {status_str}{valid_str}",
-        styles["DocSubtitle"]
-    ))
-
-    client_lines = _client_info_section(client, project)
-    if client_lines:
-        story.append(Paragraph("Información del Cliente", styles["SectionTitle"]))
-        cl_data = [[Paragraph(l[0], styles["LabelText"]), Paragraph(l[1], styles["ValueText"])] for l in client_lines]
-        cl_tbl = Table(cl_data, colWidths=[1.2 * inch, 5.0 * inch])
-        cl_tbl.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "TOP"),
-            ("TOPPADDING", (0, 0), (-1, -1), 2),
-            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
-        ]))
-        story.append(cl_tbl)
-        story.append(Spacer(1, 10))
-
-    story.append(Paragraph("Detalle de la Cotización", styles["SectionTitle"]))
-    items_tbl, _ = _build_items_table(quote.items or [], styles)
-    story.append(items_tbl)
-    story.append(Spacer(1, 12))
-
-    totals = _build_totals_box(quote.subtotal, quote.tax, quote.discount, quote.total, styles)
-    story.append(totals)
-
-    if quote.notes:
-        story.append(Spacer(1, 12))
-        story.append(Paragraph("Notas", styles["SectionTitle"]))
-        story.append(Paragraph(str(quote.notes), styles["NotesText"]))
-
-    if quote.terms:
-        story.append(Spacer(1, 10))
-        story.append(Paragraph("Términos y Condiciones", styles["SectionTitle"]))
-        story.append(Paragraph(str(quote.terms), styles["NotesText"]))
-
-    story.append(Spacer(1, 40))
+    c = canvas.Canvas(buffer, pagesize=(800, 1024))
     
-    # Firmas
-    sig_data = [
-        [HRFlowable(width="80%", thickness=0.5, color=colors.HexColor("#aaaaaa")),
-         HRFlowable(width="80%", thickness=0.5, color=colors.HexColor("#aaaaaa"))],
-        [Paragraph("Firma Cliente", styles["FooterText"]),
-         Paragraph("Firma Responsable (Rafa Robótica)", styles["FooterText"])]
-    ]
-    sig_tbl = Table(sig_data, colWidths=[3.25 * inch, 3.25 * inch])
-    sig_tbl.setStyle(TableStyle([
-        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
-        ("TOPPADDING", (0, 0), (-1, -1), 4),
-    ]))
-    story.append(sig_tbl)
-
-    story.append(Spacer(1, 20))
+    template_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "quote_template.jpg")
     
-    # QR Code
-    try:
-        url = f"https://rafarobotica.com/quotes/{quote.id}"
-        qr_code = qr.QrCodeWidget(url)
-        bounds = qr_code.getBounds()
-        w, h = bounds[2] - bounds[0], bounds[3] - bounds[1]
-        d = Drawing(60, 60, transform=[60./w, 0, 0, 60./h, 0, 0])
-        d.add(qr_code)
+    items = quote.items or []
+    items_per_page = 10
+    total_items = len(items)
+    if total_items == 0:
+        total_items = 1
+        items = [{}] 
         
-        qr_data = [[d, Paragraph("Escanea este código para consultar esta cotización digitalmente.", styles["FooterText"])]]
-        qr_tbl = Table(qr_data, colWidths=[1.0 * inch, 5.5 * inch])
-        qr_tbl.setStyle(TableStyle([
-            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
-        ]))
-        story.append(qr_tbl)
-    except Exception:
-        pass
-
-    story.append(Spacer(1, 10))
-    story.append(Paragraph(
-        f"Rafa Robótica S.A.S. - Documento generado automáticamente. Gracias por su preferencia.",
-        styles["FooterText"]
-    ))
-
-    doc.build(story)
+    num_pages = (total_items + items_per_page - 1) // items_per_page
+    
+    for page in range(num_pages):
+        if os.path.exists(template_path):
+            c.drawImage(template_path, 0, 0, 800, 1024)
+        else:
+            c.setFont("Helvetica-Bold", 16)
+            c.drawString(100, 900, "ADVERTENCIA: Plantilla de fondo no encontrada")
+            
+        c.setFont("Helvetica-Bold", 12)
+        c.setFillColorRGB(0, 0, 0)
+        
+        # N° Cotizacion
+        c.drawString(640, 938, str(quote.quote_number or quote.id))
+        
+        # Date and Time
+        dt = quote.created_at or quote.date or datetime.now()
+        date_str = getattr(dt, 'strftime', lambda x: str(dt))('%d / %m / %Y')
+        time_str = getattr(dt, 'strftime', lambda x: "")('%H : %M') if hasattr(dt, 'hour') else ""
+        
+        c.setFont("Helvetica", 12)
+        c.drawString(640, 896, date_str)
+        c.drawString(640, 866, time_str)
+        
+        # Client Data
+        c.setFont("Helvetica", 11)
+        client_name = client.company_name if client else ""
+        if client and not client_name: client_name = client.user.full_name if hasattr(client, 'user') and client.user else ""
+        c.drawString(140, 762, str(client_name))
+        c.drawString(140, 727, str(client.contact_phone if client else ""))
+        c.drawString(140, 693, str(client.user.email if (client and hasattr(client, 'user') and client.user) else ""))
+        c.drawString(140, 658, str(client.address if client else ""))
+        
+        # Quote Info
+        gen_by = quote.created_by.full_name if hasattr(quote, 'created_by') and quote.created_by else "Admin"
+        c.drawString(610, 762, str(gen_by))
+        
+        status = (quote.status.value if hasattr(quote.status, 'value') else str(quote.status)).lower()
+        if status in ['pendiente', 'borrador', 'enviada']: c.drawString(572, 727, 'X')
+        elif status == 'aprobada': c.drawString(653, 727, 'X')
+        elif status in ['rechazada', 'vencida']: c.drawString(740, 727, 'X')
+        
+        c.drawString(600, 658, str(quote.valid_until if quote.valid_until else ""))
+        
+        # Items Table
+        start_idx = page * items_per_page
+        end_idx = min(start_idx + items_per_page, len(items))
+        page_items = items[start_idx:end_idx]
+        
+        y = 594
+        c.setFont("Helvetica", 11)
+        for i, it in enumerate(page_items):
+            desc = it.get("description") or it.get("name") or ""
+            qty = it.get("quantity") or it.get("qty") or 0
+            price = it.get("unit_price") or it.get("price") or 0
+            sub = it.get("subtotal") or (float(qty) * float(price))
+            
+            c.drawCentredString(60, y, str(start_idx + i + 1))
+            c.drawString(100, y, str(desc)[:45])
+            
+            c.drawCentredString(545, y, str(qty))
+            c.drawRightString(710, y, f"${float(price):,.2f}")
+            c.drawRightString(780, y, f"${float(sub):,.2f}")
+            
+            y -= 28.5
+            
+        if page == num_pages - 1:
+            c.setFont("Helvetica", 10)
+            
+            import textwrap
+            notes = str(quote.notes or "")
+            if notes:
+                text_lines = textwrap.wrap(notes, width=50)
+                y_notes = 275
+                for line in text_lines[:4]:
+                    c.drawString(50, y_notes, line)
+                    y_notes -= 20
+                    
+            c.setFont("Helvetica-Bold", 12)
+            c.drawRightString(750, 275, f"${float(quote.subtotal or 0):,.2f}")
+            c.drawRightString(750, 245, f"${float(quote.discount or 0):,.2f}")
+            c.drawRightString(750, 215, f"${float(quote.tax or 0):,.2f}")
+            c.drawRightString(750, 185, f"${float(quote.total or 0):,.2f}")
+            
+            try:
+                from reportlab.graphics.barcode import qr
+                from reportlab.graphics.shapes import Drawing
+                from reportlab.graphics import renderPDF
+                
+                url = f"https://rafarobotica.com/quotes/{quote.id}"
+                qr_code = qr.QrCodeWidget(url)
+                bounds = qr_code.getBounds()
+                w, h = bounds[2] - bounds[0], bounds[3] - bounds[1]
+                d = Drawing(60, 60, transform=[60./w, 0, 0, 60./h, 0, 0])
+                d.add(qr_code)
+                
+                renderPDF.draw(d, c, 290, 105)
+                
+                c.setFont("Helvetica", 10)
+                c.drawString(500, 125, str(quote.id))
+            except Exception as e:
+                print("Error drawing QR:", e)
+                
+            client_doc = client.nit if client else ""
+            c.setFont("Helvetica", 11)
+            c.drawString(110, 50, str(client_doc))
+            c.drawString(580, 50, "Rafa Robótica S.A.S.")
+            
+        c.showPage()
+        
+    c.save()
     return buffer.getvalue()
 
 
