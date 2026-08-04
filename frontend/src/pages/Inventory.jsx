@@ -28,6 +28,12 @@ export default function Inventory() {
   const [loading, setLoading] = useState(true);
   const [historyLoading, setHistoryLoading] = useState(false);
   const [search, setSearch] = useState('');
+  const [debouncedSearch, setDebouncedSearch] = useState('');
+
+  useEffect(() => {
+    const t = setTimeout(() => setDebouncedSearch(search), 400);
+    return () => clearTimeout(t);
+  }, [search]);
   const [cat, setCat] = useState('');
   const [lowOnly, setLowOnly] = useState(false);
 
@@ -45,7 +51,7 @@ export default function Inventory() {
     setLoading(true);
     try {
       const [r, a] = await Promise.all([
-        inventoryAPI.list({ category: cat || undefined, low_stock: lowOnly || undefined, search: search || undefined, limit: 200 }),
+        inventoryAPI.list({ category: cat || undefined, low_stock: lowOnly || undefined, search: debouncedSearch || undefined, limit: 200 }),
         inventoryAPI.alerts().catch(() => ({ data: { total_alerts: 0, items: [] } })),
       ]);
       setItems(Array.isArray(r?.data) ? r.data : []);
@@ -54,7 +60,7 @@ export default function Inventory() {
       addToast('Error cargando inventario', 'error');
       setItems([]);
     } finally { setLoading(false); }
-  }, [cat, lowOnly, search, addToast]);
+  }, [cat, lowOnly, debouncedSearch, addToast]);
 
   const loadHistory = useCallback(async () => {
     setHistoryLoading(true);
@@ -66,7 +72,7 @@ export default function Inventory() {
     } finally { setHistoryLoading(false); }
   }, [addToast]);
 
-  useEffect(() => { load(); }, [cat, lowOnly, search]);
+  useEffect(() => { load(); }, [cat, lowOnly, debouncedSearch]);
   useEffect(() => { if (tab === 'history') loadHistory(); }, [tab]);
 
   const openNewItem = () => {
@@ -152,7 +158,7 @@ export default function Inventory() {
   };
 
   const list = (items || []).filter(i =>
-    !search || i.name.toLowerCase().includes(search.toLowerCase()) || (i.sku || '').toLowerCase().includes(search.toLowerCase())
+    !debouncedSearch || i.name.toLowerCase().includes(debouncedSearch.toLowerCase()) || (i.sku || '').toLowerCase().includes(debouncedSearch.toLowerCase())
   );
 
   const handleExportExcel = () => {
