@@ -290,7 +290,7 @@ def approve_quote(quote_id: int, convert_to_sale: bool = False, db: Session = De
             sale_number=sale_number,
             client_name=client_name or "Cliente Cotización",
             description=q.title or f"Venta de Cotización #{q.quote_number}",
-            total_amount=q.total_amount,
+            total_amount=q.total,
             payment_method="transferencia", # Default
             observations=q.notes or "Venta generada desde cotización",
             created_by_id=current_user.id
