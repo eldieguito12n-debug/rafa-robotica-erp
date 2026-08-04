@@ -366,3 +366,33 @@ def get_inventory_history(
             )
         )
     return result
+
+@router.get("/inventory/fix-schema")
+def fix_inventory_schema(db: Session = Depends(get_db)):
+    """Temporal endpoint para agregar columnas faltantes a inventory_movements."""
+    from sqlalchemy import text
+    try:
+        db.execute(text("ALTER TABLE inventory_movements ADD COLUMN user_name VARCHAR(255);"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        
+    try:
+        db.execute(text("ALTER TABLE inventory_movements ADD COLUMN user_role VARCHAR(100);"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        
+    try:
+        db.execute(text("ALTER TABLE inventory_movements ADD COLUMN project_id INTEGER;"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        
+    try:
+        db.execute(text("CREATE TABLE IF NOT EXISTS notifications (id SERIAL PRIMARY KEY, user_id INTEGER NOT NULL, title VARCHAR(255) NOT NULL, message VARCHAR(1000), type VARCHAR(100), related_id INTEGER, related_type VARCHAR(100), is_read BOOLEAN DEFAULT FALSE, created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP);"))
+        db.commit()
+    except Exception:
+        db.rollback()
+        
+    return {"message": "Schema fix execution finished."}
