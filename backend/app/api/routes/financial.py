@@ -457,11 +457,11 @@ def reject_quote(quote_id: int, db: Session = Depends(get_db), current_user: Use
     q = db.query(Quote).filter(Quote.id == quote_id).first()
     if not q:
         raise HTTPException(404, "Quote not found")
-    q.status = "rechazada"
+    db.delete(q)
     db.flush()
-    log_activity(db, current_user.id, "actualizar", "quote", q.id, {"status": "rechazada"})
+    log_activity(db, current_user.id, "eliminar", "quote", quote_id, {"action": "rechazada_y_eliminada"})
     db.commit()
-    return {"message": "Quote rejected"}
+    return {"message": "Quote rejected and deleted"}
 
 
 @router.put("/quotes/{quote_id}", response_model=QuoteSchema)

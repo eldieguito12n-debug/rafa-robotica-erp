@@ -213,11 +213,11 @@ export default function Quotes() {
   };
 
   const handleReject = async (q) => {
-    if (!window.confirm('¿Rechazar esta cotización?')) return;
+    if (!window.confirm('¿Rechazar y eliminar esta cotización permanentemente?')) return;
     setProcessingId(q.id);
     try {
       await financialAPI.rejectQuote(q.id);
-      addToast('Cotización rechazada', 'success');
+      addToast('Cotización rechazada y eliminada', 'success');
       loadQuotes();
     } catch (err) {
       addToast(err?.response?.data?.detail || 'Error al rechazar', 'error');
