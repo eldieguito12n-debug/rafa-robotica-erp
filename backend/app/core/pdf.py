@@ -19,10 +19,10 @@ from ..models import Invoice, Quote, Client, Project
 
 EMPRESA_DUMMY = {
     "nombre": "Rafa Robótica S.A.S.",
-    "nit": "NIT 901.987.654-3",
+    "nit": "NIT 1040361448",
     "direccion": "Parque Industrial, Bodega 4, Bogotá D.C.",
-    "telefono": "+57 300 123 4567",
-    "email": "contacto@rafarobotica.com",
+    "telefono": "+57 3114385093",
+    "email": "Rafilevi7@hotmail.com",
     "web": "www.rafarobotica.com",
     "slogan": "Automatización y Robótica para el Futuro",
 }
