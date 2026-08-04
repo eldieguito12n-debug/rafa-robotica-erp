@@ -98,26 +98,45 @@ def _get_company_header_styles():
 
 def _build_company_header(styles, width=7.0 * inch):
     empresa = EMPRESA_DUMMY
+    
+    # Try to load cropped logo
+    logo_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "logo_cropped.jpg")
+    logo_flowable = None
+    if os.path.exists(logo_path):
+        try:
+            # Aspect ratio 220x60
+            logo_flowable = Image(logo_path, width=2.5*inch, height=0.7*inch)
+            logo_flowable.hAlign = 'LEFT'
+        except Exception:
+            pass
+            
+    header_left = []
+    if logo_flowable:
+        header_left.append(logo_flowable)
+    else:
+        header_left.append(Paragraph(empresa["nombre"], styles["CompanyName"]))
+        header_left.append(Paragraph(empresa["slogan"], styles["CompanyDetail"]))
+        
     data = [
         [
-            Paragraph(empresa["nombre"], styles["CompanyName"]),
-            Paragraph(empresa["slogan"], styles["CompanyDetail"]),
+            header_left,
+            [
+                Paragraph("<b>COTIZACIÓN</b>", styles["DocTitle"]),
+                Paragraph(f"{empresa['nit']}<br/>{empresa['telefono']}<br/>{empresa['email']}", styles["CompanyDetail"])
+            ]
         ]
     ]
-    header_table = Table(data, colWidths=[width * 0.65, width * 0.35])
+    header_table = Table(data, colWidths=[width * 0.60, width * 0.40])
     header_table.setStyle(TableStyle([
-        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
         ("TOPPADDING", (0, 0), (-1, -1), 0),
         ("BOTTOMPADDING", (0, 0), (-1, -1), 0),
     ]))
-    detail = Paragraph(
-        f"{empresa['nit']} &nbsp;|&nbsp; {empresa['direccion']}<br/>"
-        f"{empresa['telefono']} &nbsp;|&nbsp; {empresa['email']} &nbsp;|&nbsp; {empresa['web']}",
-        styles["CompanyDetail"]
-    )
-    return [header_table, Spacer(1, 3), detail, Spacer(1, 6),
-            HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#1e3a5f")),
-            Spacer(1, 10)]
+    
+    return [header_table, Spacer(1, 10),
+            HRFlowable(width="100%", thickness=1.5, color=colors.HexColor("#f1c40f")),
+            Spacer(1, 15)]
 
 
 def _client_info_section(client: Client, project: Project = None):
@@ -268,136 +287,155 @@ def generate_invoice_pdf_bytes(db: Session, invoice_id: int) -> bytes:
 
 
 def generate_quote_pdf_bytes(db: Session, quote_id: int) -> bytes:
-    from reportlab.pdfgen import canvas
-    
     quote = db.query(Quote).filter(Quote.id == quote_id).first()
     if not quote:
         raise ValueError(f"Quote {quote_id} not found")
     client = quote.client
+    project = quote.project
 
     buffer = BytesIO()
-    c = canvas.Canvas(buffer, pagesize=(800, 1024))
+    doc = SimpleDocTemplate(
+        buffer, pagesize=letter,
+        leftMargin=0.7 * inch, rightMargin=0.7 * inch,
+        topMargin=0.6 * inch, bottomMargin=0.7 * inch,
+        title=f"Cotizacion_{quote_id}"
+    )
+    styles = _get_company_header_styles()
+    story = []
+
+    story.extend(_build_company_header(styles))
+
+    # Header info box
+    dt = quote.created_at or quote.date or datetime.now()
+    date_str = getattr(dt, 'strftime', lambda x: str(dt))('%d / %m / %Y')
     
-    template_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), "static", "quote_template.jpg")
+    quote_num = str(quote.quote_number or quote.id)
+    status_str = (quote.status.value if hasattr(quote.status, 'value') else str(quote.status)).upper()
+    valid_str = str(quote.valid_until) if quote.valid_until else "N/A"
+    gen_by = quote.created_by.full_name if hasattr(quote, 'created_by') and quote.created_by else "Admin"
     
-    items = quote.items or []
-    items_per_page = 10
-    total_items = len(items)
-    if total_items == 0:
-        total_items = 1
-        items = [{}] 
-        
-    num_pages = (total_items + items_per_page - 1) // items_per_page
+    info_data = [
+        [Paragraph("<b>Fecha:</b>", styles["LabelText"]), Paragraph(date_str, styles["ValueText"]),
+         Paragraph("<b>N° Cotización:</b>", styles["LabelText"]), Paragraph(quote_num, styles["ValueText"])],
+        [Paragraph("<b>Generado por:</b>", styles["LabelText"]), Paragraph(gen_by, styles["ValueText"]),
+         Paragraph("<b>Estado:</b>", styles["LabelText"]), Paragraph(status_str, styles["ValueText"])],
+        [Paragraph("<b>Válido hasta:</b>", styles["LabelText"]), Paragraph(valid_str, styles["ValueText"]),
+         "", ""]
+    ]
+    info_tbl = Table(info_data, colWidths=[1.1*inch, 2.4*inch, 1.1*inch, 2.4*inch])
+    info_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, -1), colors.HexColor("#f8f9fa")),
+        ("BOX", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(info_tbl)
+    story.append(Spacer(1, 15))
+
+    client_lines = _client_info_section(client, project)
+    if client_lines:
+        story.append(Paragraph("Datos del Cliente", styles["SectionTitle"]))
+        cl_data = [[Paragraph(l[0], styles["LabelText"]), Paragraph(l[1], styles["ValueText"])] for l in client_lines]
+        cl_tbl = Table(cl_data, colWidths=[1.2 * inch, 5.8 * inch])
+        cl_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "TOP"),
+            ("TOPPADDING", (0, 0), (-1, -1), 2),
+            ("BOTTOMPADDING", (0, 0), (-1, -1), 2),
+            ("LINEBELOW", (0, 0), (-1, -1), 0.25, colors.HexColor("#eeeeee")),
+        ]))
+        story.append(cl_tbl)
+        story.append(Spacer(1, 15))
+
+    story.append(Paragraph("Productos / Servicios", styles["SectionTitle"]))
+    items_tbl, _ = _build_items_table(quote.items or [], styles)
+    # Modify items table style for native look
+    items_tbl.setStyle(TableStyle([
+        ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#1e3a5f")),
+        ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+        ("FONTNAME", (0, 0), (-1, 0), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, 0), 10),
+        ("FONTNAME", (0, 1), (-1, -1), "Helvetica"),
+        ("FONTSIZE", (0, 1), (-1, -1), 9),
+        ("ALIGN", (2, 1), (-1, -1), "CENTER"), # cant
+        ("ALIGN", (3, 1), (-1, -1), "RIGHT"),  # unit
+        ("ALIGN", (4, 1), (-1, -1), "RIGHT"),  # subtotal
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+        ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+        ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f8f9fa")]),
+    ]))
+    story.append(items_tbl)
+    story.append(Spacer(1, 15))
+
+    # Totals and Notes Side by Side
+    notes_para = Paragraph(f"<b>Observaciones:</b><br/>{quote.notes or 'Ninguna'}", styles["NotesText"])
     
-    for page in range(num_pages):
-        if os.path.exists(template_path):
-            c.drawImage(template_path, 0, 0, 800, 1024)
-        else:
-            c.setFont("Helvetica-Bold", 16)
-            c.drawString(100, 900, "ADVERTENCIA: Plantilla de fondo no encontrada")
-            
-        c.setFont("Helvetica-Bold", 12)
-        c.setFillColorRGB(0, 0, 0)
+    tot_data = [
+        ["Subtotal:", f"${float(quote.subtotal or 0):,.2f}"],
+        ["Descuento:", f"${float(quote.discount or 0):,.2f}"],
+        ["IVA:", f"${float(quote.tax or 0):,.2f}"],
+        ["Total a Pagar:", f"${float(quote.total or 0):,.2f}"]
+    ]
+    tot_tbl = Table(tot_data, colWidths=[1.5*inch, 1.5*inch])
+    tot_tbl.setStyle(TableStyle([
+        ("FONTNAME", (0, 0), (-1, -1), "Helvetica-Bold"),
+        ("FONTSIZE", (0, 0), (-1, -1), 10),
+        ("ALIGN", (0, 0), (0, -1), "RIGHT"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+        ("BACKGROUND", (0, -1), (-1, -1), colors.HexColor("#f1c40f")),
+        ("TEXTCOLOR", (0, -1), (-1, -1), colors.black),
+        ("GRID", (0, 0), (-1, -1), 0.5, colors.HexColor("#cccccc")),
+        ("TOPPADDING", (0, 0), (-1, -1), 6),
+        ("BOTTOMPADDING", (0, 0), (-1, -1), 6),
+    ]))
+    
+    bottom_tbl = Table([[notes_para, tot_tbl]], colWidths=[4.0*inch, 3.0*inch])
+    bottom_tbl.setStyle(TableStyle([
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("ALIGN", (1, 0), (1, -1), "RIGHT"),
+    ]))
+    story.append(bottom_tbl)
+    
+    story.append(Spacer(1, 40))
+    
+    # Firmas
+    sig_data = [
+        [HRFlowable(width="80%", thickness=0.5, color=colors.HexColor("#aaaaaa")),
+         HRFlowable(width="80%", thickness=0.5, color=colors.HexColor("#aaaaaa"))],
+        [Paragraph(f"Firma Cliente<br/>{client.nit if client else ''}", styles["FooterText"]),
+         Paragraph("Firma Responsable<br/>Rafa Robótica S.A.S.", styles["FooterText"])]
+    ]
+    sig_tbl = Table(sig_data, colWidths=[3.5 * inch, 3.5 * inch])
+    sig_tbl.setStyle(TableStyle([
+        ("ALIGN", (0, 0), (-1, -1), "CENTER"),
+        ("VALIGN", (0, 0), (-1, -1), "TOP"),
+        ("TOPPADDING", (0, 0), (-1, -1), 4),
+    ]))
+    story.append(sig_tbl)
+
+    story.append(Spacer(1, 20))
+    
+    # QR Code
+    try:
+        url = f"https://rafarobotica.com/quotes/{quote.id}"
+        qr_code = qr.QrCodeWidget(url)
+        bounds = qr_code.getBounds()
+        w, h = bounds[2] - bounds[0], bounds[3] - bounds[1]
+        d = Drawing(60, 60, transform=[60./w, 0, 0, 60./h, 0, 0])
+        d.add(qr_code)
         
-        # N° Cotizacion
-        c.drawString(640, 938, str(quote.quote_number or quote.id))
-        
-        # Date and Time
-        dt = quote.created_at or quote.date or datetime.now()
-        date_str = getattr(dt, 'strftime', lambda x: str(dt))('%d / %m / %Y')
-        time_str = getattr(dt, 'strftime', lambda x: "")('%H : %M') if hasattr(dt, 'hour') else ""
-        
-        c.setFont("Helvetica", 12)
-        c.drawString(640, 896, date_str)
-        c.drawString(640, 866, time_str)
-        
-        # Client Data
-        c.setFont("Helvetica", 11)
-        client_name = client.company_name if client else ""
-        if client and not client_name: client_name = client.user.full_name if hasattr(client, 'user') and client.user else ""
-        c.drawString(140, 762, str(client_name))
-        c.drawString(140, 727, str(client.contact_phone if client else ""))
-        c.drawString(140, 693, str(client.user.email if (client and hasattr(client, 'user') and client.user) else ""))
-        c.drawString(140, 658, str(client.address if client else ""))
-        
-        # Quote Info
-        gen_by = quote.created_by.full_name if hasattr(quote, 'created_by') and quote.created_by else "Admin"
-        c.drawString(610, 762, str(gen_by))
-        
-        status = (quote.status.value if hasattr(quote.status, 'value') else str(quote.status)).lower()
-        if status in ['pendiente', 'borrador', 'enviada']: c.drawString(572, 727, 'X')
-        elif status == 'aprobada': c.drawString(653, 727, 'X')
-        elif status in ['rechazada', 'vencida']: c.drawString(740, 727, 'X')
-        
-        c.drawString(600, 658, str(quote.valid_until if quote.valid_until else ""))
-        
-        # Items Table
-        start_idx = page * items_per_page
-        end_idx = min(start_idx + items_per_page, len(items))
-        page_items = items[start_idx:end_idx]
-        
-        y = 594
-        c.setFont("Helvetica", 11)
-        for i, it in enumerate(page_items):
-            desc = it.get("description") or it.get("name") or ""
-            qty = it.get("quantity") or it.get("qty") or 0
-            price = it.get("unit_price") or it.get("price") or 0
-            sub = it.get("subtotal") or (float(qty) * float(price))
-            
-            c.drawCentredString(60, y, str(start_idx + i + 1))
-            c.drawString(100, y, str(desc)[:45])
-            
-            c.drawCentredString(545, y, str(qty))
-            c.drawRightString(710, y, f"${float(price):,.2f}")
-            c.drawRightString(780, y, f"${float(sub):,.2f}")
-            
-            y -= 28.5
-            
-        if page == num_pages - 1:
-            c.setFont("Helvetica", 10)
-            
-            import textwrap
-            notes = str(quote.notes or "")
-            if notes:
-                text_lines = textwrap.wrap(notes, width=50)
-                y_notes = 275
-                for line in text_lines[:4]:
-                    c.drawString(50, y_notes, line)
-                    y_notes -= 20
-                    
-            c.setFont("Helvetica-Bold", 12)
-            c.drawRightString(750, 275, f"${float(quote.subtotal or 0):,.2f}")
-            c.drawRightString(750, 245, f"${float(quote.discount or 0):,.2f}")
-            c.drawRightString(750, 215, f"${float(quote.tax or 0):,.2f}")
-            c.drawRightString(750, 185, f"${float(quote.total or 0):,.2f}")
-            
-            try:
-                from reportlab.graphics.barcode import qr
-                from reportlab.graphics.shapes import Drawing
-                from reportlab.graphics import renderPDF
-                
-                url = f"https://rafarobotica.com/quotes/{quote.id}"
-                qr_code = qr.QrCodeWidget(url)
-                bounds = qr_code.getBounds()
-                w, h = bounds[2] - bounds[0], bounds[3] - bounds[1]
-                d = Drawing(60, 60, transform=[60./w, 0, 0, 60./h, 0, 0])
-                d.add(qr_code)
-                
-                renderPDF.draw(d, c, 290, 105)
-                
-                c.setFont("Helvetica", 10)
-                c.drawString(500, 125, str(quote.id))
-            except Exception as e:
-                print("Error drawing QR:", e)
-                
-            client_doc = client.nit if client else ""
-            c.setFont("Helvetica", 11)
-            c.drawString(110, 50, str(client_doc))
-            c.drawString(580, 50, "Rafa Robótica S.A.S.")
-            
-        c.showPage()
-        
-    c.save()
+        qr_data = [[d, Paragraph("Escanea este código para consultar esta cotización digitalmente.", styles["FooterText"])]]
+        qr_tbl = Table(qr_data, colWidths=[1.0 * inch, 5.5 * inch])
+        qr_tbl.setStyle(TableStyle([
+            ("VALIGN", (0, 0), (-1, -1), "MIDDLE"),
+        ]))
+        story.append(qr_tbl)
+    except Exception:
+        pass
+
+    doc.build(story)
     return buffer.getvalue()
 
 
