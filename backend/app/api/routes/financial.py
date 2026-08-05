@@ -355,6 +355,24 @@ def delete_financial_record(
     r = db.query(FinancialRecord).filter(FinancialRecord.id == record_id).first()
     if not r:
         raise HTTPException(404, "Record not found")
+        
+    # Eliminar venta directa y cotización asociada si aplica
+    if r.type == "venta" and r.reference:
+        from ...models import DirectSale, Quote, ActivityLog
+        sale = db.query(DirectSale).filter(DirectSale.sale_number == r.reference).first()
+        if sale:
+            log_entry = db.query(ActivityLog).filter(
+                ActivityLog.entity_type == "direct_sale",
+                ActivityLog.entity_id == sale.id,
+                ActivityLog.action == "crear"
+            ).first()
+            if log_entry and log_entry.details and "quote_id" in log_entry.details:
+                quote_id = log_entry.details["quote_id"]
+                quote = db.query(Quote).filter(Quote.id == quote_id).first()
+                if quote:
+                    db.delete(quote)
+            db.delete(sale)
+
     log_activity(db, current_user.id, "eliminar", "financial_record", r.id, {"description": r.description, "amount": r.amount})
     db.delete(r)
     db.commit()
