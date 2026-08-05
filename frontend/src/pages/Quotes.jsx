@@ -240,6 +240,17 @@ export default function Quotes() {
     }
   };
 
+  const handleDeleteSale = async (s) => {
+    if (!window.confirm('¿Estás seguro de que deseas eliminar esta venta directa permanentemente? También se eliminará del registro financiero.')) return;
+    try {
+      await financialAPI.removeSale(s.id);
+      addToast('Venta eliminada correctamente', 'success');
+      loadSales();
+    } catch (err) {
+      addToast(err?.response?.data?.detail || 'Error al eliminar la venta', 'error');
+    }
+  };
+
   const handleSaleSubmit = async (e) => {
     e.preventDefault();
     setSaving(true);
@@ -449,11 +460,12 @@ export default function Quotes() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-4 gap-1.5 mt-auto">
+                <div className="grid grid-cols-5 gap-1.5 mt-auto">
                   <ActionBtn Ic={FaEye} label="Ver PDF" onClick={() => handleSalePdfAction(s, 'open')} />
                   <ActionBtn Ic={FaFilePdf} label="Descargar" onClick={() => handleSalePdfAction(s, 'download')} />
                   <ActionBtn Ic={FaPrint} label="Imprimir" onClick={() => handleSalePdfAction(s, 'open')} />
                   <ActionBtn Ic={FaWhatsapp} label="WhatsApp" onClick={() => handleSaleWhatsApp(s)} />
+                  <ActionBtn Ic={FaTrash} label="Eliminar" onClick={() => handleDeleteSale(s)} className="!bg-red-500/10 !text-red-500 !border-red-500/30 hover:!bg-red-500 hover:!text-white" />
                 </div>
               </div>
             </motion.div>

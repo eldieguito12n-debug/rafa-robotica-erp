@@ -581,3 +581,36 @@ def download_sale_pdf(
         media_type="application/pdf",
         headers={"Content-Disposition": f"attachment; filename={filename}"},
     )
+
+@router.delete("/sales/{sale_id}")
+def delete_sale(
+    sale_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(require_admin),
+):
+    s = db.query(DirectSale).filter(DirectSale.id == sale_id).first()
+    if not s:
+        raise HTTPException(404, "Sale not found")
+        
+    # Delete corresponding financial record
+    fin_record = db.query(FinancialRecord).filter(FinancialRecord.reference == s.sale_number, FinancialRecord.type == "venta").first()
+    if fin_record:
+        db.delete(fin_record)
+        
+    # Check if quote should be deleted
+    from ...models import Quote, ActivityLog
+    log_entry = db.query(ActivityLog).filter(
+        ActivityLog.entity_type == "direct_sale",
+        ActivityLog.entity_id == s.id,
+        ActivityLog.action == "crear"
+    ).first()
+    if log_entry and log_entry.details and "quote_id" in log_entry.details:
+        quote_id = log_entry.details["quote_id"]
+        quote = db.query(Quote).filter(Quote.id == quote_id).first()
+        if quote:
+            db.delete(quote)
+            
+    log_activity(db, current_user.id, "eliminar", "direct_sale", s.id, {"sale_number": s.sale_number})
+    db.delete(s)
+    db.commit()
+    return {"message": "Sale deleted"}
