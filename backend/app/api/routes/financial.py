@@ -365,9 +365,15 @@ def delete_financial_record(
     elif r.reference and r.reference.startswith("VEN-"):
         is_venta = True
 
-    if is_venta and r.reference:
+    if is_venta:
         from ...models import DirectSale, Quote, ActivityLog
-        sale = db.query(DirectSale).filter(DirectSale.sale_number == r.reference).first()
+        sale = None
+        if r.reference:
+            sale = db.query(DirectSale).filter(DirectSale.sale_number == r.reference).first()
+        if not sale and r.description:
+            # Fallback for old records
+            sale = db.query(DirectSale).filter(DirectSale.description == r.description).first()
+            
         if sale:
             log_entry = db.query(ActivityLog).filter(
                 ActivityLog.entity_type == "direct_sale",
@@ -601,7 +607,7 @@ def delete_sale(
         raise HTTPException(404, "Sale not found")
         
     # Delete corresponding financial record
-    fin_record = db.query(FinancialRecord).filter(FinancialRecord.reference == s.sale_number, FinancialRecord.type == "venta").first()
+    fin_record = db.query(FinancialRecord).filter(FinancialRecord.reference == s.sale_number).first()
     if fin_record:
         db.delete(fin_record)
         
