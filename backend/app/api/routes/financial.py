@@ -357,7 +357,15 @@ def delete_financial_record(
         raise HTTPException(404, "Record not found")
         
     # Eliminar venta directa y cotización asociada si aplica
-    if r.type == "venta" and r.reference:
+    is_venta = False
+    if r.type == "venta":
+        is_venta = True
+    elif hasattr(r.type, 'value') and r.type.value == "venta":
+        is_venta = True
+    elif r.reference and r.reference.startswith("VEN-"):
+        is_venta = True
+
+    if is_venta and r.reference:
         from ...models import DirectSale, Quote, ActivityLog
         sale = db.query(DirectSale).filter(DirectSale.sale_number == r.reference).first()
         if sale:
