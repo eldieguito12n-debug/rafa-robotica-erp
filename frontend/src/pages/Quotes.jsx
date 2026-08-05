@@ -246,6 +246,7 @@ export default function Quotes() {
       await financialAPI.removeSale(s.id);
       addToast('Venta eliminada correctamente', 'success');
       loadSales();
+      loadQuotes();
     } catch (err) {
       addToast(err?.response?.data?.detail || 'Error al eliminar la venta', 'error');
     }
