@@ -1,0 +1,21 @@
+{
+  "name": "RoboLab ERP",
+  "short_name": "RoboLab",
+  "description": "Sistema Inteligente de Laboratorio",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0f1c",
+  "theme_color": "#0a0f1c",
+  "icons": [
+    {
+      "src": "/logo.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "/logo.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
+  ]
+}

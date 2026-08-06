@@ -11,7 +11,7 @@ export default function AppLayout() {
       <Sidebar />
       <div className="flex-1 flex flex-col min-w-0">
         <Topbar />
-        <main className="flex-1 p-4 md:p-6 lg:p-8 relative z-10">
+        <main className="flex-1 p-3 sm:p-4 md:p-6 lg:p-8 relative z-10">
           <motion.div
             key={location.pathname}
             initial={{ opacity: 0, y: 10 }}

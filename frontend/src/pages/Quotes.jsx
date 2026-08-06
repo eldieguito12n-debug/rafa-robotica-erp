@@ -113,6 +113,11 @@ export default function Quotes() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Open window synchronously to avoid popup blockers on mobile
+    let newWindow = window.open('', '_blank');
+    if (newWindow) newWindow.document.write('Guardando cotización y generando PDF...');
+    
     setSaving(true);
     try {
       const payload = { ...form };
@@ -132,20 +137,29 @@ export default function Quotes() {
       setShowModal(false);
       loadQuotes();
       
-      // Auto-open PDF
+      // Auto-open PDF using the pre-opened window
       if (res.data && res.data.id) {
-        handlePdfAction(res.data, 'open');
+        handlePdfAction(res.data, 'open', newWindow);
+      } else if (newWindow) {
+        newWindow.close();
       }
     } catch (err) {
       addToast(err?.response?.data?.detail || 'Error guardando cotización', 'error');
+      if (newWindow) newWindow.close();
     } finally {
       setSaving(false);
     }
   };
 
-  const handlePdfAction = async (q, action = 'download') => {
+  const handlePdfAction = async (q, action = 'download', preOpenedWindow = null) => {
+    let newWindow = preOpenedWindow;
+    if (action === 'open' && !newWindow) {
+      newWindow = window.open('', '_blank');
+      if (newWindow) newWindow.document.write('Generando PDF, por favor espera...');
+    }
+    
     try {
-      addToast(action === 'download' ? 'Descargando...' : 'Generando PDF...', 'info');
+      if (!preOpenedWindow) addToast(action === 'download' ? 'Descargando...' : 'Generando PDF...', 'info');
       const res = await api.get(`/quotes/${q.id}/download`, { responseType: 'blob' });
       const blob = new Blob([res.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
@@ -157,10 +171,15 @@ export default function Quotes() {
         link.click();
         link.remove();
       } else {
-        window.open(url, '_blank');
+        if (newWindow) {
+          newWindow.location.href = url;
+        } else {
+          window.open(url, '_blank');
+        }
       }
     } catch (err) {
-      addToast('Error al generar PDF', 'error');
+      if (!preOpenedWindow) addToast('Error al generar PDF', 'error');
+      if (newWindow) newWindow.close();
     }
   };
 
@@ -254,6 +273,10 @@ export default function Quotes() {
 
   const handleSaleSubmit = async (e) => {
     e.preventDefault();
+    
+    let newWindow = window.open('', '_blank');
+    if (newWindow) newWindow.document.write('Guardando venta y generando recibo...');
+    
     setSaving(true);
     try {
       const payload = { ...saleForm, total_amount: Number(saleForm.total_amount) };
@@ -262,18 +285,27 @@ export default function Quotes() {
       setShowSaleModal(false);
       loadSales();
       if (res.data && res.data.id) {
-        handleSalePdfAction(res.data, 'open');
+        handleSalePdfAction(res.data, 'open', newWindow);
+      } else if (newWindow) {
+        newWindow.close();
       }
     } catch (err) {
       addToast('Error registrando venta', 'error');
+      if (newWindow) newWindow.close();
     } finally {
       setSaving(false);
     }
   };
 
-  const handleSalePdfAction = async (s, action = 'download') => {
+  const handleSalePdfAction = async (s, action = 'download', preOpenedWindow = null) => {
+    let newWindow = preOpenedWindow;
+    if (action === 'open' && !newWindow) {
+      newWindow = window.open('', '_blank');
+      if (newWindow) newWindow.document.write('Generando PDF, por favor espera...');
+    }
+
     try {
-      addToast(action === 'download' ? 'Descargando...' : 'Generando PDF...', 'info');
+      if (!preOpenedWindow) addToast(action === 'download' ? 'Descargando...' : 'Generando PDF...', 'info');
       const res = await api.get(`/sales/${s.id}/pdf`, { responseType: 'blob' });
       const blob = new Blob([res.data], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
@@ -285,10 +317,15 @@ export default function Quotes() {
         link.click();
         link.remove();
       } else {
-        window.open(url, '_blank');
+        if (newWindow) {
+          newWindow.location.href = url;
+        } else {
+          window.open(url, '_blank');
+        }
       }
     } catch (err) {
-      addToast('Error al generar PDF de venta', 'error');
+      if (!preOpenedWindow) addToast('Error al generar PDF', 'error');
+      if (newWindow) newWindow.close();
     }
   };
 
@@ -477,9 +514,13 @@ export default function Quotes() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-2xl w-[95vw] mx-auto p-6 shadow-glass relative z-10 max-h-[90vh] overflow-y-auto">
-            <h3 className="text-xl font-bold heading-glow mb-1">Nueva Cotización</h3>
-            <p className="text-xs text-dark-400 mb-5">Genera una nueva cotización para tu cliente</p>
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-4xl w-[95vw] mx-auto p-5 md:p-6 shadow-glass relative z-10 max-h-[90vh] overflow-y-auto flex flex-col">
+            <div className="flex items-center justify-between mb-5">
+              <div>
+                <h3 className="text-xl font-bold heading-glow mb-1">Nueva Cotización</h3>
+                <p className="text-xs text-dark-400">Genera una nueva cotización para tu cliente</p>
+              </div>
+            </div>
             <form onSubmit={handleSubmit} className="space-y-4">
               <div>
                 <label className="block text-xs font-semibold text-dark-300 mb-1.5 uppercase tracking-wider">Cliente *</label>
@@ -564,7 +605,7 @@ export default function Quotes() {
       {showSaleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-sm" onClick={() => setShowSaleModal(false)} />
-          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-lg w-[95vw] mx-auto p-6 shadow-glass relative z-10 max-h-[90vh] overflow-y-auto">
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-lg w-[95vw] mx-auto p-5 md:p-6 shadow-glass relative z-10 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold heading-glow mb-1">Nueva Venta Directa</h3>
             <p className="text-xs text-dark-400 mb-5">Registra una nueva venta sin afectar el inventario.</p>
             <form onSubmit={handleSaleSubmit} className="space-y-4">

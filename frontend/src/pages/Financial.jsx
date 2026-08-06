@@ -196,7 +196,7 @@ export default function Financial() {
       {showModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
           <div className="absolute inset-0 bg-dark-950/80 backdrop-blur-sm" onClick={() => setShowModal(false)} />
-          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-lg w-[95vw] mx-auto p-6 shadow-glass relative z-10">
+          <motion.div initial={{ opacity: 0, y: 20, scale: 0.98 }} animate={{ opacity: 1, y: 0, scale: 1 }} className="glass rounded-3xl max-w-lg w-[95vw] mx-auto p-5 md:p-6 shadow-glass relative z-10 max-h-[90vh] overflow-y-auto">
             <h3 className="text-xl font-bold heading-glow mb-1">Nuevo Movimiento Financiero</h3>
             <p className="text-xs text-dark-400 mb-5">Registra un ingreso, egreso, compra o venta</p>
             <form onSubmit={handleSubmit} className="space-y-4">
